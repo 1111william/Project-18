@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+backend/.env
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Test/cache
+.pytest_cache/
+.coverage
+
+# Logs
+*.log
