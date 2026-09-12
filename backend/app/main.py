@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.routers import quizzes
+from backend.app.routers import quizzes, progress
 
 
 app = FastAPI(
@@ -23,6 +23,12 @@ app.include_router(
     quizzes.router,
     prefix="/api/quizzes",
     tags=["Quiz"]
+)
+
+app.include_router(
+    progress.router,
+    prefix="/api/progress",
+    tags=["Progress"]
 )
 
 
