@@ -1,17 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from backend.app import settings
+from backend.app.config import settings
 
 
-DATABASE_URL = (
-    f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
-    f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
-)
+DATABASE_URL = settings.database_url
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=280,
+    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(
