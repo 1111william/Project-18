@@ -23,3 +23,7 @@ backend/.env
 
 # Logs
 *.log
+
+# Local account data and runtime
+backend/.local/
+frontend/.env.local
