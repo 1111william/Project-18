@@ -11,7 +11,7 @@ from fastapi import Depends
 from backend.app.config import settings
 from backend.app.core.responses import ApiError, ErrorCode, api_error_handler, failure, ok
 from backend.app.database import get_db
-from backend.app.routers import children, quizzes
+from backend.app.routers import children, quizzes, progress
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +70,12 @@ app.include_router(
     children.router,
     prefix="/api/children",
     tags=["Children"]
+)
+
+app.include_router(
+    progress.router,
+    prefix="/api/progress",
+    tags=["Progress"]
 )
 
 
