@@ -1,25 +1,41 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Virtual environment
+*.py[cod]
+*.so
 .venv/
 venv/
-
-# Environment variables
-backend/.env
-
-# PyCharm
-.idea/
-
-# macOS
-.DS_Store
-
-# Test/cache
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
 .coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
-# Logs
+# JavaScript
+node_modules/
+frontend/dist/
+.npm-cache/
+
+# Local configuration and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Runtime/build output
 *.log
+dist/
+build/
+*.sqlite
+*.sqlite3
+mysql-data/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.config import settings
-from backend.app.core.responses import ApiError, ErrorCode, ok
+from backend.app.core.responses import ApiError, ErrorCode, Unauthenticated, ok
 from backend.app.database import get_db
 from backend.app.middleware import current_parent_id, owned_child
-from backend.app.models import ChildProfile, LearningLevel
+from backend.app.models import ChildProfile, LearningLevel, Parent
 from backend.app.schemas.child import ChildCreate, ChildOut, ChildSummary, ChildUpdate
+
 
 router = APIRouter()
 
@@ -19,7 +20,11 @@ def list_children(
 ):
     rows = db.execute(
         select(ChildProfile, LearningLevel.title)
-        .join(LearningLevel, LearningLevel.levelID == ChildProfile.currentLevelID, isouter=True)
+        .join(
+            LearningLevel,
+            LearningLevel.levelID == ChildProfile.currentLevelID,
+            isouter=True,
+        )
         .where(ChildProfile.parentID == parent_id)
         .order_by(ChildProfile.createdAt)
     ).all()
@@ -44,30 +49,48 @@ def create_child(
     parent_id: int = Depends(current_parent_id),
     db: Session = Depends(get_db),
 ):
-    total = db.scalar(
-        select(func.count()).select_from(ChildProfile).where(ChildProfile.parentID == parent_id)
-    )
-    if total >= settings.MAX_CHILDREN_PER_PARENT:
-        raise ApiError(
-            409,
-            f"Maximum of {settings.MAX_CHILDREN_PER_PARENT} child profiles per account",
-            ErrorCode.LIMIT_REACHED,
+    try:
+        # Serialize creation per parent so concurrent requests cannot both
+        # observe the same pre-limit count on MySQL/InnoDB.
+        parent = db.scalar(
+            select(Parent)
+            .where(Parent.parentID == parent_id)
+            .with_for_update()
         )
+        if parent is None:
+            raise Unauthenticated("Session account no longer exists")
 
-    first_level = db.scalar(select(LearningLevel).order_by(LearningLevel.levelOrder).limit(1))
+        child_ids = db.scalars(
+            select(ChildProfile.childID)
+            .where(ChildProfile.parentID == parent_id)
+            .with_for_update()
+        ).all()
+        if len(child_ids) >= settings.MAX_CHILDREN_PER_PARENT:
+            raise ApiError(
+                409,
+                f"Maximum of {settings.MAX_CHILDREN_PER_PARENT} child profiles per account",
+                ErrorCode.LIMIT_REACHED,
+            )
 
-    child = ChildProfile(
-        parentID=parent_id,
-        nickname=body.nickname.strip(),
-        avatar=body.avatar,
-        ageBand=body.ageBand,
-        currentLevelID=first_level.levelID if first_level else None,
-    )
-    db.add(child)
-    db.commit()
-    db.refresh(child)
+        first_level = db.scalar(
+            select(LearningLevel).order_by(LearningLevel.levelOrder).limit(1)
+        )
+        child = ChildProfile(
+            parentID=parent_id,
+            nickname=body.nickname,
+            avatar=body.avatar,
+            ageBand=body.ageBand,
+            currentLevelID=first_level.levelID if first_level else None,
+        )
+        db.add(child)
+        db.flush()
+        child_id = child.childID
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
-    return ok({"childID": child.childID})
+    return ok({"childID": child_id})
 
 
 @router.put("/{childID}")
@@ -76,15 +99,21 @@ def update_child(
     child: ChildProfile = Depends(owned_child),
     db: Session = Depends(get_db),
 ):
-    if body.nickname is not None:
-        child.nickname = body.nickname.strip()
-    if body.ageBand is not None:
-        child.ageBand = body.ageBand
-    if body.avatar is not None:
-        child.avatar = body.avatar
-    db.commit()
+    try:
+        fields_set = body.model_fields_set
+        if "nickname" in fields_set:
+            child.nickname = body.nickname
+        if "ageBand" in fields_set:
+            child.ageBand = body.ageBand
+        if "avatar" in fields_set:
+            child.avatar = body.avatar
 
-    return ok({"childID": child.childID})
+        child_id = child.childID
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return ok({"childID": child_id})
 
 
 @router.delete("/{childID}")
@@ -93,7 +122,11 @@ def delete_child(
     db: Session = Depends(get_db),
 ):
     child_id = child.childID
-    db.delete(child)
-    db.commit()
+    try:
+        db.delete(child)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return ok({"deleted": child_id})

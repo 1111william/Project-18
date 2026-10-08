@@ -1,19 +1,45 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _normalise_required_nickname(value):
+    if value is None:
+        raise ValueError("nickname cannot be null")
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if not value:
+        raise ValueError("nickname must not be blank")
+    return value
 
 
 class ChildCreate(BaseModel):
     nickname: str = Field(min_length=1, max_length=60)
-    avatar: Optional[str] = Field(default=None, max_length=150)
+    avatar: str | None = Field(default=None, max_length=150)
     ageBand: Literal["junior", "senior"] = "junior"
+
+    _validate_nickname = field_validator("nickname", mode="before")(
+        _normalise_required_nickname
+    )
 
 
 class ChildUpdate(BaseModel):
-    nickname: Optional[str] = Field(default=None, min_length=1, max_length=60)
-    avatar: Optional[str] = Field(default=None, max_length=150)
-    ageBand: Optional[Literal["junior", "senior"]] = None
+    nickname: str | None = Field(default=None, min_length=1, max_length=60)
+    avatar: str | None = Field(default=None, max_length=150)
+    ageBand: Literal["junior", "senior"] | None = None
+
+    _validate_nickname = field_validator("nickname", mode="before")(
+        _normalise_required_nickname
+    )
+
+    @field_validator("ageBand", mode="before")
+    @classmethod
+    def reject_null_age_band(cls, value):
+        if value is None:
+            raise ValueError("ageBand cannot be null")
+        return value
 
 
 class ChildOut(BaseModel):
@@ -22,10 +48,10 @@ class ChildOut(BaseModel):
     childID: int
     parentID: int
     nickname: str
-    avatar: Optional[str]
+    avatar: str | None
     ageBand: str
-    currentLevelID: Optional[int]
-    createdAt: Optional[datetime]
+    currentLevelID: int | None
+    createdAt: datetime | None
 
 
 class ChildSummary(BaseModel):
@@ -33,7 +59,7 @@ class ChildSummary(BaseModel):
 
     childID: int
     nickname: str
-    avatar: Optional[str]
+    avatar: str | None
     ageBand: str
-    currentLevelID: Optional[int]
-    levelTitle: Optional[str] = None
+    currentLevelID: int | None
+    levelTitle: str | None = None
