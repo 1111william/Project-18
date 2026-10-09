@@ -20,9 +20,10 @@ from sqlalchemy.pool import StaticPool
 from backend.app.config import settings
 from backend.app.core.responses import ApiError, ErrorCode
 from backend.app.database import Base
-from backend.app.models import ChildProfile, LearningLevel, Parent
+from backend.app.models import ChildProfile, LearningLevel, Lesson, Parent, Progress
 from backend.app.routers.children import (
     create_child,
+    get_student_home,
     list_children,
     update_child,
 )
@@ -123,6 +124,56 @@ class ChildRouterTests(unittest.TestCase):
         self.assertFalse(self.db.in_transaction())
         names = self.db.scalars(select(ChildProfile.nickname)).all()
         self.assertEqual(names, ["First"])
+
+    def test_student_home_returns_level_lessons_and_progress(self):
+        child = ChildProfile(
+            childID=10,
+            parentID=1,
+            nickname="Rafi",
+            ageBand="junior",
+            currentLevelID=1,
+        )
+        self.db.add(child)
+        self.db.add_all(
+            [
+                Lesson(
+                    lessonID=1,
+                    levelID=1,
+                    strand="letters",
+                    lessonOrder=1,
+                    title="Vowel letters",
+                    estimatedMinutes=5,
+                ),
+                Lesson(
+                    lessonID=2,
+                    levelID=1,
+                    strand="culture",
+                    lessonOrder=1,
+                    title="Festivals",
+                    estimatedMinutes=6,
+                ),
+            ]
+        )
+        self.db.add(
+            Progress(
+                childID=10,
+                lessonID=1,
+                percentComplete=60,
+                completed=False,
+            )
+        )
+        self.db.commit()
+
+        payload = response_json(get_student_home(child=child, db=self.db))["data"]
+
+        self.assertEqual(payload["child"]["nickname"], "Rafi")
+        self.assertEqual(payload["child"]["levelTitle"], "Beginner")
+        self.assertEqual(payload["summary"]["lessonCount"], 2)
+        self.assertEqual(payload["summary"]["overallProgress"], 30)
+        self.assertEqual(
+            {lesson["title"] for lesson in payload["lessons"]},
+            {"Vowel letters", "Festivals"},
+        )
 
     def test_missing_locked_parent_returns_401(self):
         with self.assertRaises(ApiError) as caught:
