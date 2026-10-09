@@ -98,3 +98,16 @@ class ResetPasswordRequest(BaseModel):
 class ParentPinRequest(BaseModel):
     pin: str = Field(pattern=r"^\d{4}$")
 
+
+class ResetParentPinRequest(BaseModel):
+    challenge_id: str
+    new_pin: str = Field(pattern=r"^\d{4}$")
+
+    @field_validator("challenge_id")
+    @classmethod
+    def validate_challenge_id(cls, value: str) -> str:
+        try:
+            return str(uuid.UUID(value))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("The PIN reset request is invalid.") from exc
+

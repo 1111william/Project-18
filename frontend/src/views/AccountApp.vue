@@ -35,6 +35,8 @@ const isChildEdit = computed(() => isChildCreate.value && editingChildId.value !
 const isStudentHome = computed(() => !!signedIn.value && page.value === 'student-home')
 const isParentPinSet = computed(() => !!signedIn.value && page.value === 'parent-pin-set')
 const isParentPinVerify = computed(() => !!signedIn.value && page.value === 'parent-pin')
+const isParentPinForgot = computed(() => !!signedIn.value && page.value === 'parent-pin-forgot')
+const isParentPinReset = computed(() => !!signedIn.value && page.value === 'parent-pin-reset')
 const isParentPlaceholder = computed(() => !!signedIn.value && page.value === 'parent-dashboard')
 const currentTitle = computed(() => {
   if (!signedIn.value) return titles[page.value]
@@ -42,6 +44,8 @@ const currentTitle = computed(() => {
   if (isChildCreate.value) return isChildEdit.value ? 'Edit child profile' : 'Add child profile'
   if (isParentPinSet.value) return 'Set parent PIN'
   if (isParentPinVerify.value) return 'Enter parent area'
+  if (isParentPinForgot.value) return 'Reset parent PIN'
+  if (isParentPinReset.value) return 'Choose a new parent PIN'
   if (isParentPlaceholder.value) return 'Parent area'
   return 'Child profiles'
 })
@@ -51,6 +55,8 @@ const currentSubtitle = computed(() => {
   if (isChildCreate.value) return isChildEdit.value ? 'Update their profile details.' : 'Create a space that feels like their own.'
   if (isParentPinSet.value) return 'A small PIN keeps parent-only areas safe.'
   if (isParentPinVerify.value) return 'Enter your 4-digit PIN to continue.'
+  if (isParentPinForgot.value) return 'Enter the verification code sent to your registered email.'
+  if (isParentPinReset.value) return 'Choose a new 4-digit PIN for parent-only areas.'
   if (isParentPlaceholder.value) return 'Parent access has been verified.'
   return 'Create a profile for each child who uses this account.'
 })
@@ -226,6 +232,59 @@ function verifyParentAccess() {
     go('parent-dashboard')
     notice.value = 'Parent access verified.'
   }, { field: 'parentAccessPin' })
+}
+function startParentPinReset() {
+  run(async () => {
+    challenge.value = await accountApi('/auth/pin/forgot', { method: 'POST', body: {} })
+    code.value = ''
+    now.value = Date.now()
+    go('parent-pin-forgot')
+  })
+}
+function verifyParentPinResetCode() {
+  if (!/^\d{6}$/.test(code.value)) {
+    fieldErrors.value = { ...fieldErrors.value, code: 'Enter the 6-digit verification code.' }
+    return
+  }
+  run(async () => {
+    const result = await accountApi('/auth/verify-code', {
+      method: 'POST',
+      body: { challenge_id: challenge.value.challenge_id, code: code.value },
+    })
+    if (!result.pin_reset) throw new Error('The PIN reset request is invalid.')
+    parentPin.value = ''
+    confirmParentPin.value = ''
+    go('parent-pin-reset')
+    notice.value = 'Code verified. Choose your new parent PIN.'
+  }, { field: 'code' })
+}
+function submitParentPinReset() {
+  const next = {}
+  if (!/^\d{4}$/.test(parentPin.value)) next.pin = 'Enter a 4-digit PIN.'
+  if (!confirmParentPin.value) next.pinConfirm = 'Enter the PIN again.'
+  else if (parentPin.value !== confirmParentPin.value) next.pinConfirm = 'The PINs do not match.'
+  fieldErrors.value = next
+  if (Object.keys(next).length) return
+  run(async () => {
+    await accountApi('/auth/pin/reset', {
+      method: 'POST',
+      body: { challenge_id: challenge.value.challenge_id, new_pin: parentPin.value },
+    })
+    challenge.value = null
+    code.value = ''
+    parentPin.value = ''
+    confirmParentPin.value = ''
+    parentAccessPin.value = ''
+    go('parent-pin')
+    notice.value = 'Your parent PIN has been reset. Enter the new PIN to continue.'
+  }, { field: 'pin' })
+}
+function cancelParentPinReset() {
+  challenge.value = null
+  code.value = ''
+  parentPin.value = ''
+  confirmParentPin.value = ''
+  go('parent-pin')
 }
 function selectAvatar(id) {
   selectedAvatar.value = id
@@ -417,6 +476,7 @@ function signOut() {
       <button v-if="isChildCreate && !booting" class="child-back-button" type="button" @click="cancelChildCreate">← Back to child profiles</button>
       <button v-else-if="isStudentHome && !booting" class="child-back-button" type="button" @click="closeStudentHome">← Back to child profiles</button>
       <button v-else-if="isParentPinSet && !booting" class="child-back-button" type="button" @click="cancelPinEditor">← Back to child profiles</button>
+      <button v-else-if="(isParentPinForgot || isParentPinReset) && !booting" class="child-back-button" type="button" @click="cancelParentPinReset">← Back to parent PIN</button>
       <button v-else-if="(isParentPinVerify || isParentPlaceholder) && !booting" class="child-back-button" type="button" @click="closeParentArea">← Back to child profiles</button>
       <div v-else-if="signedIn && !booting" class="account-session">
         <strong>{{ signedIn.email }}</strong>
@@ -462,6 +522,34 @@ function signOut() {
               <p v-if="fieldErrors.parentAccessPin" id="parent-access-pin-error" class="field-error" role="alert">{{ fieldErrors.parentAccessPin }}</p>
               <p id="parent-access-pin-hint" class="field-hint">Five incorrect attempts will temporarily lock parent access.</p>
               <button class="primary submit-button" type="submit">{{ busy ? 'Checking…' : 'Continue to parent area' }} <span v-if="!busy" aria-hidden="true">→</span></button>
+              <button class="text-button forgot" type="button" :disabled="busy" @click="startParentPinReset">Forgot PIN?</button>
+            </fieldset>
+          </form>
+          <form v-else-if="isParentPinForgot" class="parent-pin-gate" novalidate @submit.prevent="verifyParentPinResetCode">
+            <fieldset :disabled="busy">
+              <div class="email-summary">Verification for <strong>{{ signedIn.email }}</strong></div>
+              <label for="pin-reset-code">6-digit verification code</label>
+              <input id="pin-reset-code" v-model="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required :aria-invalid="!!fieldErrors.code" :aria-describedby="fieldErrors.code ? 'pin-reset-code-error pin-reset-code-hint' : 'pin-reset-code-hint'" @input="clearFieldError('code')">
+              <p v-if="fieldErrors.code" id="pin-reset-code-error" class="field-error" role="alert">{{ fieldErrors.code }}</p>
+              <p id="pin-reset-code-hint" class="field-hint">Valid for 10 minutes. Up to 5 attempts.</p>
+              <div v-if="challenge?.delivery === 'development'" class="development-code">Local development code: <strong>{{ challenge.development_code }}</strong><br>No email was sent.</div>
+              <button class="primary submit-button" type="submit">{{ busy ? 'Checking…' : 'Verify & continue' }} <span v-if="!busy" aria-hidden="true">→</span></button>
+              <div class="resend-row"><span>Need another code?</span><button class="text-button" type="button" :disabled="cooldown > 0 || busy" @click="resend">{{ cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code' }}</button></div>
+            </fieldset>
+          </form>
+          <form v-else-if="isParentPinReset" class="pin-editor" novalidate @submit.prevent="submitParentPinReset">
+            <fieldset :disabled="busy">
+              <p>Choose a PIN that children cannot easily guess.</p>
+              <label for="new-parent-pin">New 4-digit PIN</label>
+              <input id="new-parent-pin" v-model="parentPin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" maxlength="4" placeholder="••••" :aria-invalid="!!fieldErrors.pin" :aria-describedby="fieldErrors.pin ? 'new-pin-error' : undefined" @input="clearFieldError('pin')">
+              <p v-if="fieldErrors.pin" id="new-pin-error" class="field-error" role="alert">{{ fieldErrors.pin }}</p>
+              <label for="new-parent-pin-confirm">Confirm new PIN</label>
+              <input id="new-parent-pin-confirm" v-model="confirmParentPin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" maxlength="4" placeholder="••••" :aria-invalid="!!fieldErrors.pinConfirm" :aria-describedby="fieldErrors.pinConfirm ? 'new-pin-confirm-error' : undefined" @input="clearFieldError('pinConfirm')">
+              <p v-if="fieldErrors.pinConfirm" id="new-pin-confirm-error" class="field-error" role="alert">{{ fieldErrors.pinConfirm }}</p>
+              <div class="pin-editor-actions">
+                <button class="secondary" type="button" @click="cancelParentPinReset">Cancel</button>
+                <button class="primary" type="submit">Reset PIN</button>
+              </div>
             </fieldset>
           </form>
           <section v-else-if="isParentPlaceholder" class="parent-dashboard-placeholder">

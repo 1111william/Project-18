@@ -15,6 +15,7 @@ from backend.app.schemas.account_auth import (
     RegisterCodeRequest,
     ResendCodeRequest,
     ResetPasswordRequest,
+    ResetParentPinRequest,
     VerifyCodeRequest,
 )
 from backend.app.services.account_auth import (
@@ -104,6 +105,9 @@ def verify_registration_code(
     if pending.purpose == "password_reset":
         challenge = registration_challenges.authorize_password_reset(payload.challenge_id, payload.code)
         return ok({"password_reset": True, "challenge_id": challenge.challenge_id})
+    if pending.purpose == "pin_reset":
+        challenge = registration_challenges.authorize_pin_reset(payload.challenge_id, payload.code)
+        return ok({"pin_reset": True, "challenge_id": challenge.challenge_id})
 
     challenge = registration_challenges.verify(payload.challenge_id, payload.code)
     if challenge.purpose != "register":
@@ -216,6 +220,39 @@ def verify_parent_pin(
     request.session["pinAttempts"] = 0
     request.session.pop("pinLockedUntil", None)
     return ok({"pin_verified": True})
+
+
+@router.post("/pin/forgot")
+def request_parent_pin_reset_code(
+    parent_id: int = Depends(current_parent_id),
+    db: Session = Depends(get_db),
+):
+    parent = get_parent(db, parent_id)
+    if not parent.pinHash:
+        raise ApiError(409, "Set a parent PIN first.", ErrorCode.PIN_REQUIRED, ["pin"])
+    challenge, code = registration_challenges.create_pin_reset(parent.email, parent.parentID)
+    return verification_challenge_response(challenge, code)
+
+
+@router.post("/pin/reset")
+def reset_parent_pin(
+    payload: ResetParentPinRequest,
+    request: Request,
+    parent_id: int = Depends(current_parent_id),
+    db: Session = Depends(get_db),
+):
+    challenge = registration_challenges.get_authorized_pin_reset(payload.challenge_id)
+    parent = get_parent(db, parent_id)
+    if challenge.parent_id != parent.parentID or challenge.email != parent.email:
+        raise ApiError(400, "The PIN reset request is invalid.", ErrorCode.VALIDATION_FAILED)
+    parent.pinHash = hash_password(payload.new_pin)
+    db.add(parent)
+    db.commit()
+    registration_challenges.consume(challenge.challenge_id)
+    request.session["pinVerified"] = False
+    request.session["pinAttempts"] = 0
+    request.session.pop("pinLockedUntil", None)
+    return ok({"pin_reset": True})
 
 
 @router.post("/logout")
