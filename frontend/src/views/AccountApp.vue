@@ -11,6 +11,7 @@ const email = ref(''), password = ref(''), confirm = ref(''), code = ref('')
 const fieldErrors = ref({})
 const busy = ref(false), booting = ref(true), challenge = ref(null), signedIn = ref(null)
 const children = ref([]), childrenLoading = ref(false)
+const studentHome = ref(null)
 const developmentCodes = ref(false), now = ref(Date.now()), heading = ref(null)
 const childNickname = ref(''), childAgeBand = ref('junior'), selectedAvatar = ref('sprout')
 const editingChildId = ref(null)
@@ -31,11 +32,13 @@ const titles = { login: 'Welcome back.', register: 'Start something wonderful.',
 const subtitles = { login: 'A little learning. A world of possibility.', register: 'Create your account and begin your journey.', forgot: 'Enter your email and we will send you a verification code.', verify: 'Enter the six-digit code to continue.', reset: 'Choose a secure password for your account.' }
 const isChildCreate = computed(() => !!signedIn.value && page.value === 'child-create')
 const isChildEdit = computed(() => isChildCreate.value && editingChildId.value !== null)
+const isStudentHome = computed(() => !!signedIn.value && page.value === 'student-home')
 const isParentPinSet = computed(() => !!signedIn.value && page.value === 'parent-pin-set')
 const isParentPinVerify = computed(() => !!signedIn.value && page.value === 'parent-pin')
 const isParentPlaceholder = computed(() => !!signedIn.value && page.value === 'parent-dashboard')
 const currentTitle = computed(() => {
   if (!signedIn.value) return titles[page.value]
+  if (isStudentHome.value) return `${studentHome.value?.child?.nickname || 'Student'}’s learning`
   if (isChildCreate.value) return isChildEdit.value ? 'Edit child profile' : 'Add child profile'
   if (isParentPinSet.value) return 'Set parent PIN'
   if (isParentPinVerify.value) return 'Enter parent area'
@@ -44,6 +47,7 @@ const currentTitle = computed(() => {
 })
 const currentSubtitle = computed(() => {
   if (!signedIn.value) return subtitles[page.value]
+  if (isStudentHome.value) return studentHome.value?.level?.description || 'Choose a lesson and keep learning.'
   if (isChildCreate.value) return isChildEdit.value ? 'Update their profile details.' : 'Create a space that feels like their own.'
   if (isParentPinSet.value) return 'A small PIN keeps parent-only areas safe.'
   if (isParentPinVerify.value) return 'Enter your 4-digit PIN to continue.'
@@ -113,6 +117,17 @@ function openChildEdit(child) {
 }
 function cancelChildCreate() {
   resetChildForm()
+  go('login')
+}
+function openStudentHome(child) {
+  cancelDeleteConfirm()
+  run(async () => {
+    studentHome.value = await accountApi(`/children/${child.childID}/home`)
+    go('student-home')
+  })
+}
+function closeStudentHome() {
+  studentHome.value = null
   go('login')
 }
 function openDeleteConfirm(childId) {
@@ -391,7 +406,7 @@ function signOut() {
     await accountApi('/auth/logout', { method: 'POST', body: {} })
     cancelPinEditor()
     parentAccessPin.value = ''
-    signedIn.value = null; children.value = []; email.value = ''; password.value = ''; go('login')
+    signedIn.value = null; children.value = []; studentHome.value = null; email.value = ''; password.value = ''; go('login')
   })
 }
 </script>
@@ -400,6 +415,7 @@ function signOut() {
   <main class="account-page">
     <section class="account-content" :class="{ 'profiles-content': signedIn }" aria-labelledby="page-title" :aria-busy="busy || booting">
       <button v-if="isChildCreate && !booting" class="child-back-button" type="button" @click="cancelChildCreate">← Back to child profiles</button>
+      <button v-else-if="isStudentHome && !booting" class="child-back-button" type="button" @click="closeStudentHome">← Back to child profiles</button>
       <button v-else-if="isParentPinSet && !booting" class="child-back-button" type="button" @click="cancelPinEditor">← Back to child profiles</button>
       <button v-else-if="(isParentPinVerify || isParentPlaceholder) && !booting" class="child-back-button" type="button" @click="closeParentArea">← Back to child profiles</button>
       <div v-else-if="signedIn && !booting" class="account-session">
@@ -454,6 +470,54 @@ function signOut() {
             <p>The Parent Dashboard will be connected here by the team member responsible for that page.</p>
             <button class="secondary" type="button" @click="closeParentArea">Back to child profiles</button>
           </section>
+          <section v-else-if="isStudentHome && studentHome" class="student-home" aria-label="Student homepage">
+            <div class="student-hero">
+              <img class="student-avatar" :class="{ custom: isCustomAvatar(studentHome.child.avatar) }" :src="avatarSource(studentHome.child.avatar)" alt="">
+              <div>
+                <span class="student-eyebrow">Welcome back</span>
+                <h2>{{ studentHome.child.nickname }}</h2>
+                <p>{{ studentHome.child.ageBand === 'senior' ? 'Senior learner' : 'Junior learner' }} · {{ studentHome.child.levelTitle || 'Learning path' }}</p>
+              </div>
+            </div>
+            <div class="student-summary">
+              <div>
+                <strong>{{ studentHome.summary.overallProgress }}%</strong>
+                <span>Overall progress</span>
+              </div>
+              <div>
+                <strong>{{ studentHome.summary.completedLessons }}/{{ studentHome.summary.lessonCount }}</strong>
+                <span>Lessons completed</span>
+              </div>
+            </div>
+            <div class="progress-track" role="progressbar" aria-label="Overall learning progress" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="studentHome.summary.overallProgress">
+              <span :style="{ width: `${studentHome.summary.overallProgress}%` }"></span>
+            </div>
+            <div class="learning-path-heading">
+              <div>
+                <span class="student-eyebrow">Current level</span>
+                <h2>{{ studentHome.level?.title || 'Getting started' }}</h2>
+              </div>
+              <span>{{ studentHome.summary.lessonCount }} {{ studentHome.summary.lessonCount === 1 ? 'lesson' : 'lessons' }}</span>
+            </div>
+            <div v-if="studentHome.lessons.length" class="lesson-grid">
+              <article v-for="lesson in studentHome.lessons" :key="lesson.lessonID" class="lesson-card">
+                <div class="lesson-card-topline">
+                  <span>{{ lesson.strand }}</span>
+                  <span>{{ lesson.estimatedMinutes }} min</span>
+                </div>
+                <h3>{{ lesson.title }}</h3>
+                <p>{{ lesson.summary || 'A new learning activity is ready.' }}</p>
+                <div class="lesson-progress">
+                  <span :style="{ width: `${lesson.percentComplete}%` }"></span>
+                </div>
+                <small>{{ lesson.completed ? 'Completed' : `${lesson.percentComplete}% complete` }}</small>
+              </article>
+            </div>
+            <div v-else class="student-empty-lessons">
+              <h2>New lessons are coming soon.</h2>
+              <p>This profile is ready for learning content at the current level.</p>
+            </div>
+          </section>
           <form v-else-if="isChildCreate" class="child-profile-form" novalidate @submit.prevent="submitChildProfile">
             <fieldset>
               <label for="child-nickname">Child’s nickname</label>
@@ -504,6 +568,7 @@ function signOut() {
                 <img class="profile-avatar-image" :class="{ custom: isCustomAvatar(child.avatar) }" :src="avatarSource(child.avatar)" alt="">
                 <strong>{{ child.nickname }}</strong>
                 <small>{{ child.ageBand === 'senior' ? 'Senior learner' : 'Junior learner' }}<template v-if="child.levelTitle"> · {{ child.levelTitle }}</template></small>
+                <button class="profile-learn-button" type="button" :aria-label="`Open ${child.nickname}'s student homepage`" @click="openStudentHome(child)">Start learning <span aria-hidden="true">→</span></button>
                 <div class="profile-card-actions">
                   <button class="profile-edit-button" type="button" :aria-label="`Edit ${child.nickname}'s profile`" @click="openChildEdit(child)">Edit</button>
                   <button class="profile-delete-button" type="button" :aria-label="`Delete ${child.nickname}'s profile`" @click="openDeleteConfirm(child.childID)">Delete</button>
@@ -901,6 +966,178 @@ button.profile-avatar-choice {
   font-size: 14px;
 }
 
+.profile-learn-button {
+  background: #2c513e;
+  border: 1px solid #2c513e;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  width: 100%;
+}
+
+.profile-learn-button:hover:not(:disabled) {
+  background: #203f30;
+}
+
+.student-home {
+  display: grid;
+  gap: 24px;
+}
+
+.student-hero {
+  align-items: center;
+  background: linear-gradient(135deg, #edf3e5, #f8f3df);
+  border: 1px solid #c8d5ba;
+  border-radius: 24px;
+  display: flex;
+  gap: 22px;
+  padding: 28px;
+}
+
+.student-avatar {
+  background: #fff;
+  border: 2px solid #cbd8c7;
+  border-radius: 50%;
+  height: 112px;
+  object-fit: contain;
+  padding: 7px;
+  width: 112px;
+}
+
+.student-avatar.custom {
+  object-fit: cover;
+  padding: 0;
+}
+
+.student-eyebrow {
+  color: #66815b;
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.student-hero h2,
+.learning-path-heading h2 {
+  color: #174b39;
+  margin: 0 0 5px;
+}
+
+.student-hero p {
+  color: #52675e;
+  margin: 0;
+}
+
+.student-summary {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.student-summary > div {
+  background: #fff;
+  border: 1px solid #dce4d5;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
+
+.student-summary strong {
+  color: #174b39;
+  font-size: 26px;
+}
+
+.student-summary span {
+  color: #6c7f65;
+  font-size: 13px;
+}
+
+.progress-track,
+.lesson-progress {
+  background: #e1e8da;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-track span,
+.lesson-progress span {
+  background: #6f915b;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.learning-path-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+.learning-path-heading > span {
+  color: #6c7f65;
+  font-size: 14px;
+}
+
+.lesson-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lesson-card {
+  background: #fff;
+  border: 1px solid #dce4d5;
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.lesson-card-topline {
+  color: #718069;
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+  text-transform: capitalize;
+}
+
+.lesson-card h3 {
+  color: #24473b;
+  font-size: 18px;
+  margin: 14px 0 7px;
+}
+
+.lesson-card p {
+  color: #63716d;
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+.lesson-card small {
+  color: #6c7f65;
+  display: block;
+  margin-top: 8px;
+}
+
+.student-empty-lessons {
+  background: #f3f6ed;
+  border: 1px dashed #c8d5ba;
+  border-radius: 18px;
+  padding: 30px;
+  text-align: center;
+}
+
+.student-empty-lessons p {
+  color: #6c7f65;
+  margin-bottom: 0;
+}
+
 .profile-card-actions {
   display: flex;
   gap: 8px;
@@ -1010,6 +1247,16 @@ button.profile-avatar-choice {
   }
 
   .child-form-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .student-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .student-summary,
+  .lesson-grid {
     grid-template-columns: 1fr;
   }
 }

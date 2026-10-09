@@ -4,14 +4,14 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from backend.app.config import settings
 from backend.app.core.responses import ApiError, ErrorCode, Unauthenticated, ok
 from backend.app.database import get_db
 from backend.app.middleware import current_parent_id, owned_child
-from backend.app.models import ChildProfile, LearningLevel, Parent
+from backend.app.models import ChildProfile, LearningLevel, Lesson, Parent, Progress
 from backend.app.schemas.child import (
     ChildCreate,
     ChildDeleteConfirm,
@@ -175,6 +175,77 @@ def list_children(
 @router.get("/{childID}")
 def get_child(child: ChildProfile = Depends(owned_child)):
     return ok(ChildOut.model_validate(child))
+
+
+@router.get("/{childID}/home")
+def get_student_home(
+    child: ChildProfile = Depends(owned_child),
+    db: Session = Depends(get_db),
+):
+    level = db.get(LearningLevel, child.currentLevelID) if child.currentLevelID else None
+    rows = []
+    if child.currentLevelID:
+        rows = db.execute(
+            select(Lesson, Progress)
+            .outerjoin(
+                Progress,
+                and_(
+                    Progress.lessonID == Lesson.lessonID,
+                    Progress.childID == child.childID,
+                ),
+            )
+            .where(
+                Lesson.levelID == child.currentLevelID,
+                Lesson.isPublished.is_(True),
+            )
+            .order_by(Lesson.strand, Lesson.lessonOrder)
+        ).all()
+
+    lessons = [
+        {
+            "lessonID": lesson.lessonID,
+            "strand": lesson.strand,
+            "title": lesson.title,
+            "summary": lesson.summary,
+            "estimatedMinutes": lesson.estimatedMinutes,
+            "percentComplete": progress.percentComplete if progress else 0,
+            "completed": progress.completed if progress else False,
+        }
+        for lesson, progress in rows
+    ]
+    completed_lessons = sum(1 for lesson in lessons if lesson["completed"])
+    overall_progress = (
+        round(sum(lesson["percentComplete"] for lesson in lessons) / len(lessons))
+        if lessons
+        else 0
+    )
+
+    return ok(
+        {
+            "child": {
+                "childID": child.childID,
+                "nickname": child.nickname,
+                "avatar": child.avatar,
+                "ageBand": child.ageBand,
+                "currentLevelID": child.currentLevelID,
+                "levelTitle": level.title if level else None,
+            },
+            "level": (
+                {
+                    "title": level.title,
+                    "description": level.description,
+                }
+                if level
+                else None
+            ),
+            "summary": {
+                "lessonCount": len(lessons),
+                "completedLessons": completed_lessons,
+                "overallProgress": overall_progress,
+            },
+            "lessons": lessons,
+        }
+    )
 
 
 @router.post("")
