@@ -127,6 +127,33 @@ class Settings:
             1,
         )
 
+        self.EMAIL_DELIVERY = self._value(
+            env, "EMAIL_DELIVERY", "development"
+        ).strip().lower()
+        if self.EMAIL_DELIVERY not in {"development", "smtp"}:
+            raise RuntimeError("EMAIL_DELIVERY must be development or smtp")
+        self.AUTH_DEVELOPMENT_CODES = _parse_bool(
+            self._value(env, "AUTH_DEVELOPMENT_CODES", "1"),
+            "AUTH_DEVELOPMENT_CODES",
+        )
+        self.SMTP_HOST = self._value(env, "SMTP_HOST", "smtp.gmail.com").strip()
+        self.SMTP_PORT = _parse_int(
+            self._value(env, "SMTP_PORT", "587"), "SMTP_PORT", 1, 65535
+        )
+        self.SMTP_USERNAME = self._value(env, "SMTP_USERNAME", "").strip()
+        self.SMTP_PASSWORD = self._value(env, "SMTP_PASSWORD", "").replace(" ", "")
+        self.SMTP_FROM_EMAIL = self._value(env, "SMTP_FROM_EMAIL", "").strip()
+        self.SMTP_FROM_NAME = self._value(env, "SMTP_FROM_NAME", "Project 18").strip()
+        self.SMTP_STARTTLS = _parse_bool(
+            self._value(env, "SMTP_STARTTLS", "1"), "SMTP_STARTTLS"
+        )
+        self.SMTP_TIMEOUT_SECONDS = _parse_int(
+            self._value(env, "SMTP_TIMEOUT_SECONDS", "20"),
+            "SMTP_TIMEOUT_SECONDS",
+            1,
+            120,
+        )
+
         self.DB_POOL_SIZE = _parse_int(
             self._value(env, "DB_POOL_SIZE", "5"), "DB_POOL_SIZE", 1
         )

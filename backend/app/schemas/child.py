@@ -1,7 +1,25 @@
+import re
+import uuid
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+PRESET_AVATARS = {"sprout", "bunny", "koala", "flower"}
+CUSTOM_AVATAR_PATTERN = re.compile(
+    r"^custom:[0-9]+-[a-f0-9]{32}\.(?:png|jpg|webp)$"
+)
+
+
+def _validate_avatar(value: str | None) -> str | None:
+    if value is None:
+        return value
+    if value.startswith("custom:") and not CUSTOM_AVATAR_PATTERN.fullmatch(value):
+        raise ValueError("Choose a valid avatar.")
+    if value.strip():
+        return value
+    raise ValueError("Choose a valid avatar.")
 
 
 def _normalise_required_nickname(value):
@@ -23,6 +41,7 @@ class ChildCreate(BaseModel):
     _validate_nickname = field_validator("nickname", mode="before")(
         _normalise_required_nickname
     )
+    _validate_avatar_value = field_validator("avatar")(_validate_avatar)
 
 
 class ChildUpdate(BaseModel):
@@ -33,6 +52,7 @@ class ChildUpdate(BaseModel):
     _validate_nickname = field_validator("nickname", mode="before")(
         _normalise_required_nickname
     )
+    _validate_avatar_value = field_validator("avatar")(_validate_avatar)
 
     @field_validator("ageBand", mode="before")
     @classmethod
@@ -40,6 +60,19 @@ class ChildUpdate(BaseModel):
         if value is None:
             raise ValueError("ageBand cannot be null")
         return value
+
+
+class ChildDeleteConfirm(BaseModel):
+    challenge_id: str
+    code: str = Field(pattern=r"^\d{6}$")
+
+    @field_validator("challenge_id")
+    @classmethod
+    def validate_challenge_id(cls, value: str) -> str:
+        try:
+            return str(uuid.UUID(value))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("The deletion verification request is invalid.") from exc
 
 
 class ChildOut(BaseModel):

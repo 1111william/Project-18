@@ -33,6 +33,8 @@ build/
 *.sqlite
 *.sqlite3
 mysql-data/
+backend/.local/
+frontend/.env.local
 
 # Editors and operating systems
 .idea/

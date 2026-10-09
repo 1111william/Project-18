@@ -1,6 +1,6 @@
 # API contract
 
-This document defines the shared frontend/backend conventions. It does not turn incomplete authentication, PIN, or Quiz placeholders into supported product features.
+This document defines the shared frontend/backend conventions. Account, parent-PIN, and child-profile routes are supported; the Quiz routes remain placeholders.
 
 ## JSON envelope
 
@@ -48,7 +48,21 @@ Protected routes read a signed session cookie. A missing session returns `401 UN
 
 Unsafe cookie-authenticated methods (`POST`, `PUT`, `PATCH`, and `DELETE`) require an exact same-origin or allowed `Origin`/`Referer`; failures return `403 CSRF_FAILED`. Cross-origin browser clients must send credentials and originate from an exact entry in `ALLOWED_ORIGINS`.
 
-Test code may create a correctly signed session cookie to exercise guards. That bypasses credential verification and therefore is not evidence that login, logout, password recovery, admin elevation, or PIN entry works. Those flows remain pending until their routes and tests land.
+Password login creates the signed session immediately; it does not require an email verification code. Registration and password recovery use short-lived email-code challenges. Parent PIN verification is a separate session flag used for parent-only areas.
+
+## Account and parent PIN
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /api/auth/register` | Request a registration email code |
+| `POST /api/auth/verify-code` | Complete registration or authorize password recovery |
+| `POST /api/auth/login` | Sign in directly with email and password |
+| `POST /api/auth/forgot-password` | Request a password-recovery code |
+| `POST /api/auth/reset-password` | Set a new password after code verification |
+| `GET /api/auth/me` | Read the signed-in parent account |
+| `PUT /api/auth/pin` | Set the four-digit parent PIN once |
+| `POST /api/auth/pin/verify` | Verify the PIN for the current session |
+| `POST /api/auth/logout` | Clear the signed session |
 
 ## Child profiles
 
@@ -73,7 +87,8 @@ Child-profile fields remain camelCase for compatibility.
 | `POST /api/children` | Create a child | `{ "childID": 4 }` |
 | `GET /api/children/{childID}` | Read an owned child | Child object |
 | `PUT /api/children/{childID}` | Update an owned child | `{ "childID": 4 }` |
-| `DELETE /api/children/{childID}` | Delete an owned child | `{ "deleted": 4 }` |
+| `POST /api/children/{childID}/delete-code` | Request the child-deletion email code | Challenge data |
+| `DELETE /api/children/{childID}` | Verify the code and delete an owned child | `{ "deleted": 4 }` |
 
 Create accepts `nickname` (1–60 characters), optional `avatar`, and `ageBand` (`junior` or `senior`). Update accepts the same fields optionally. Whitespace-only nicknames are rejected after trimming. On update, explicit `null` clears `avatar`; explicit `null` for `nickname` or `ageBand` returns HTTP 400 `VALIDATION_FAILED`.
 

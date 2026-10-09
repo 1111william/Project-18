@@ -11,7 +11,7 @@ This repository contains a Vue frontend scaffold and a FastAPI/MySQL backend fou
 
 ## Implementation status
 
-Child-profile CRUD and the shared response/error conventions are the current backend integration base. Real authentication/login, PIN verification flows, and complete Quiz behavior remain assigned work; placeholder or test-signed sessions must not be presented as finished authentication.
+Child-profile CRUD, account registration and password login, password recovery, parent PIN verification, and the shared response/error conventions are the current backend integration base. Complete Quiz behavior remains assigned work.
 
 ## Start here
 

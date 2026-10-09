@@ -4,7 +4,7 @@ FastAPI, SQLAlchemy, and MySQL backend for the Bangla learning platform. Run all
 
 ## Current scope
 
-The child-profile foundation and shared API envelope are the stable integration surface. Authentication/login, PIN workflows, and complete Quiz persistence and business rules are still team work in progress. Tests that manufacture a signed session cookie exercise authorization guards only; they do not prove a real login flow.
+The child-profile foundation, account/password session flow, parent PIN workflow, and shared API envelope are the stable integration surface. Complete Quiz persistence and business rules are still team work in progress.
 
 See [docs/api-contract.md](docs/api-contract.md) before adding frontend calls and [docs/deployment.md](docs/deployment.md) before configuring Railway or AWS.
 
