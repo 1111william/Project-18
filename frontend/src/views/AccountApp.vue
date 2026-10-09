@@ -12,7 +12,7 @@ const fieldErrors = ref({})
 const busy = ref(false), booting = ref(true), challenge = ref(null), signedIn = ref(null)
 const children = ref([]), childrenLoading = ref(false)
 const developmentCodes = ref(false), now = ref(Date.now()), heading = ref(null)
-const childNickname = ref(''), childAge = ref(''), selectedAvatar = ref('sprout')
+const childNickname = ref(''), childAgeBand = ref('junior'), selectedAvatar = ref('sprout')
 const editingChildId = ref(null)
 const deleteConfirmId = ref(null)
 const deleteChallenge = ref(null), deleteCode = ref('')
@@ -78,7 +78,7 @@ function clearFieldError(field) {
 function resetChildForm() {
   editingChildId.value = null
   childNickname.value = ''
-  childAge.value = ''
+  childAgeBand.value = 'junior'
   selectedAvatar.value = 'sprout'
   customAvatarName.value = ''
   customAvatarFile.value = null
@@ -100,7 +100,7 @@ function openChildEdit(child) {
   resetChildForm()
   editingChildId.value = child.childID
   childNickname.value = child.nickname
-  childAge.value = String(child.age)
+  childAgeBand.value = child.ageBand
   if (isCustomAvatar(child.avatar)) {
     selectedAvatar.value = 'custom'
     existingCustomAvatar.value = child.avatar
@@ -240,11 +240,9 @@ function uploadAvatar(event) {
 function submitChildProfile() {
   const next = {}
   const nickname = childNickname.value.trim()
-  const age = Number(childAge.value)
   if (!nickname) next.nickname = "Enter the child's nickname."
   else if (nickname.length > 60) next.nickname = 'Nickname must be no more than 60 characters.'
-  if (childAge.value === '') next.age = "Enter the child's age."
-  else if (!Number.isInteger(age) || age <= 0) next.age = 'Enter a valid age.'
+  if (!['junior', 'senior'].includes(childAgeBand.value)) next.ageBand = 'Choose an age group.'
   if (selectedAvatar.value === 'custom' && !customAvatarFile.value && !existingCustomAvatar.value) {
     next.avatar = 'Choose an image to use as the custom avatar.'
   }
@@ -266,7 +264,7 @@ function submitChildProfile() {
     }
     await accountApi(childId === null ? '/children' : `/children/${childId}`, {
       method: childId === null ? 'POST' : 'PUT',
-      body: { nickname, age, avatar },
+      body: { nickname, ageBand: childAgeBand.value, avatar },
     })
     await loadChildren()
     resetChildForm()
@@ -481,9 +479,13 @@ function signOut() {
                 <p v-if="fieldErrors.avatar" id="avatar-error" class="field-error" role="alert">{{ fieldErrors.avatar }}</p>
               </fieldset>
 
-              <label for="child-age">Child’s age</label>
-              <input id="child-age" v-model="childAge" type="number" inputmode="numeric" autocomplete="off" placeholder="Enter age" required :aria-invalid="!!fieldErrors.age" :aria-describedby="fieldErrors.age ? 'age-error' : undefined" @input="clearFieldError('age')">
-              <p v-if="fieldErrors.age" id="age-error" class="field-error" role="alert">{{ fieldErrors.age }}</p>
+              <label for="child-age-band">Age group</label>
+              <select id="child-age-band" v-model="childAgeBand" required :aria-invalid="!!fieldErrors.ageBand" :aria-describedby="fieldErrors.ageBand ? 'age-band-error' : 'age-band-hint'" @change="clearFieldError('ageBand')">
+                <option value="junior">Junior learner</option>
+                <option value="senior">Senior learner</option>
+              </select>
+              <p id="age-band-hint" class="field-hint">The age group determines the child’s starting learning content.</p>
+              <p v-if="fieldErrors.ageBand" id="age-band-error" class="field-error" role="alert">{{ fieldErrors.ageBand }}</p>
 
               <div class="child-form-actions">
                 <button class="secondary" type="button" @click="cancelChildCreate">Cancel</button>
@@ -501,7 +503,7 @@ function signOut() {
               <article v-for="child in children" :key="child.childID" class="profile-card">
                 <img class="profile-avatar-image" :class="{ custom: isCustomAvatar(child.avatar) }" :src="avatarSource(child.avatar)" alt="">
                 <strong>{{ child.nickname }}</strong>
-                <small>Age {{ child.age }}</small>
+                <small>{{ child.ageBand === 'senior' ? 'Senior learner' : 'Junior learner' }}<template v-if="child.levelTitle"> · {{ child.levelTitle }}</template></small>
                 <div class="profile-card-actions">
                   <button class="profile-edit-button" type="button" :aria-label="`Edit ${child.nickname}'s profile`" @click="openChildEdit(child)">Edit</button>
                   <button class="profile-delete-button" type="button" :aria-label="`Delete ${child.nickname}'s profile`" @click="openDeleteConfirm(child.childID)">Delete</button>

@@ -7,6 +7,12 @@ from pydantic import BaseModel, Field, field_validator
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
+def _validate_bcrypt_password(value: str) -> str:
+    if len(value.encode("utf-8")) > 72:
+        raise ValueError("Password must not exceed 72 UTF-8 bytes.")
+    return value
+
+
 class RegisterCodeRequest(BaseModel):
     email: str = Field(max_length=254)
     password: str = Field(min_length=8, max_length=128)
@@ -18,6 +24,8 @@ class RegisterCodeRequest(BaseModel):
         if not EMAIL_PATTERN.fullmatch(normalized):
             raise ValueError("Enter a valid email address.")
         return normalized
+
+    _validate_password = field_validator("password")(_validate_bcrypt_password)
 
 
 class LoginCodeRequest(BaseModel):
@@ -31,6 +39,8 @@ class LoginCodeRequest(BaseModel):
         if not EMAIL_PATTERN.fullmatch(normalized):
             raise ValueError("Enter a valid email address.")
         return normalized
+
+    _validate_password = field_validator("password")(_validate_bcrypt_password)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -81,6 +91,8 @@ class ResetPasswordRequest(BaseModel):
             return str(uuid.UUID(value))
         except (ValueError, AttributeError) as exc:
             raise ValueError("The password reset request is invalid.") from exc
+
+    _validate_password = field_validator("new_password")(_validate_bcrypt_password)
 
 
 class ParentPinRequest(BaseModel):

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -16,8 +17,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.database import Base
 
 
+def _mysql_table_options() -> dict[str, str]:
+    """Return consistent Unicode defaults without sharing a mutable dict."""
+
+    return {
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+
 class Parent(Base):
     __tablename__ = "Parent"
+    __table_args__ = _mysql_table_options()
 
     parentID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
@@ -36,6 +47,17 @@ class Parent(Base):
 
 class LearningLevel(Base):
     __tablename__ = "LearningLevel"
+    __table_args__ = (
+        CheckConstraint(
+            "levelOrder > 0",
+            name="ck_learning_level_order_positive",
+        ),
+        CheckConstraint(
+            "passMark >= 0 AND passMark <= 100",
+            name="ck_learning_level_pass_mark_range",
+        ),
+        _mysql_table_options(),
+    )
 
     levelID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     levelOrder: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
@@ -43,26 +65,45 @@ class LearningLevel(Base):
     description: Mapped[str] = mapped_column(String(255), nullable=True)
     passMark: Mapped[int] = mapped_column(Integer, nullable=False, default=70)
 
-    lessons: Mapped[list["Lesson"]] = relationship(back_populates="level")
+    lessons: Mapped[list["Lesson"]] = relationship(
+        back_populates="level",
+        passive_deletes="all",
+    )
 
 
 class ChildProfile(Base):
     __tablename__ = "ChildProfile"
+    __table_args__ = _mysql_table_options()
 
     childID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     parentID: Mapped[int] = mapped_column(
         ForeignKey("Parent.parentID", ondelete="CASCADE"), nullable=False, index=True
     )
     nickname: Mapped[str] = mapped_column(String(60), nullable=False)
-    age: Mapped[int] = mapped_column(Integer, nullable=False)
-    avatar: Mapped[str] = mapped_column(String(150), nullable=False, default="sprout")
+    avatar: Mapped[str] = mapped_column(String(150), nullable=True)
+    ageBand: Mapped[str] = mapped_column(String(20), nullable=False, default="junior")
+    currentLevelID: Mapped[int] = mapped_column(
+        ForeignKey("LearningLevel.levelID", ondelete="SET NULL"), nullable=True, index=True
+    )
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     parent: Mapped["Parent"] = relationship(back_populates="children")
+    level: Mapped["LearningLevel"] = relationship()
 
 
 class Lesson(Base):
     __tablename__ = "Lesson"
+    __table_args__ = (
+        CheckConstraint(
+            "lessonOrder > 0",
+            name="ck_lesson_order_positive",
+        ),
+        CheckConstraint(
+            "estimatedMinutes >= 0",
+            name="ck_lesson_estimated_minutes_nonnegative",
+        ),
+        _mysql_table_options(),
+    )
 
     lessonID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     levelID: Mapped[int] = mapped_column(
@@ -84,6 +125,13 @@ class Lesson(Base):
 
 class LearningContent(Base):
     __tablename__ = "LearningContent"
+    __table_args__ = (
+        CheckConstraint(
+            "blockOrder > 0",
+            name="ck_learning_content_block_order_positive",
+        ),
+        _mysql_table_options(),
+    )
 
     contentID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lessonID: Mapped[int] = mapped_column(
@@ -101,6 +149,7 @@ class LearningContent(Base):
 
 class AudioResource(Base):
     __tablename__ = "AudioResource"
+    __table_args__ = _mysql_table_options()
 
     audioID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lessonID: Mapped[int] = mapped_column(
@@ -118,6 +167,13 @@ class AudioResource(Base):
 
 class Quiz(Base):
     __tablename__ = "Quiz"
+    __table_args__ = (
+        CheckConstraint(
+            "passMark >= 0 AND passMark <= 100",
+            name="ck_quiz_pass_mark_range",
+        ),
+        _mysql_table_options(),
+    )
 
     quizID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lessonID: Mapped[int] = mapped_column(
@@ -133,6 +189,13 @@ class Quiz(Base):
 
 class QuizQuestion(Base):
     __tablename__ = "QuizQuestion"
+    __table_args__ = (
+        CheckConstraint(
+            "questionOrder > 0",
+            name="ck_quiz_question_order_positive",
+        ),
+        _mysql_table_options(),
+    )
 
     questionID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     quizID: Mapped[int] = mapped_column(
@@ -151,6 +214,13 @@ class QuizQuestion(Base):
 
 class QuizOption(Base):
     __tablename__ = "QuizOption"
+    __table_args__ = (
+        CheckConstraint(
+            "optionOrder > 0",
+            name="ck_quiz_option_order_positive",
+        ),
+        _mysql_table_options(),
+    )
 
     optionID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     questionID: Mapped[int] = mapped_column(
@@ -168,6 +238,15 @@ class Progress(Base):
     __table_args__ = (
         UniqueConstraint("childID", "lessonID", name="uq_progress_child_lesson"),
         Index("idx_progress_lesson", "lessonID"),
+        CheckConstraint(
+            "percentComplete >= 0 AND percentComplete <= 100",
+            name="ck_progress_percent_complete_range",
+        ),
+        CheckConstraint(
+            "secondsSpent >= 0",
+            name="ck_progress_seconds_spent_nonnegative",
+        ),
+        _mysql_table_options(),
     )
 
     progressID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -185,6 +264,29 @@ class Progress(Base):
 
 class QuizResult(Base):
     __tablename__ = "QuizResult"
+    __table_args__ = (
+        CheckConstraint(
+            "score >= 0 AND score <= 100",
+            name="ck_quiz_result_score_range",
+        ),
+        CheckConstraint(
+            "correctCount >= 0",
+            name="ck_quiz_result_correct_count_nonnegative",
+        ),
+        CheckConstraint(
+            "totalCount > 0",
+            name="ck_quiz_result_total_count_positive",
+        ),
+        CheckConstraint(
+            "correctCount <= totalCount",
+            name="ck_quiz_result_correct_lte_total",
+        ),
+        CheckConstraint(
+            "attemptNumber > 0",
+            name="ck_quiz_result_attempt_number_positive",
+        ),
+        _mysql_table_options(),
+    )
 
     resultID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     childID: Mapped[int] = mapped_column(
