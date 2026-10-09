@@ -206,7 +206,23 @@ class MySQLHTTPTests(unittest.TestCase):
         body, _ = self.expect(self.api.request("GET", f"/api/children/{child_id}", cookie=self.cookie), 200)
         self.assertIsNone(body["data"]["avatar"])
         self.assertEqual(body["data"]["nickname"], "বাংলা 😀")
-        self.expect(self.api.request("DELETE", f"/api/children/{child_id}", cookie=self.cookie, origin=self.api.url), 200)
+        challenge, _ = self.expect(self.api.request(
+            "POST",
+            f"/api/children/{child_id}/delete-code",
+            cookie=self.cookie,
+            origin=self.api.url,
+            body={},
+        ), 200)
+        self.expect(self.api.request(
+            "DELETE",
+            f"/api/children/{child_id}",
+            cookie=self.cookie,
+            origin=self.api.url,
+            body={
+                "challenge_id": challenge["data"]["challenge_id"],
+                "code": challenge["data"]["development_code"],
+            },
+        ), 200)
         self.expect(self.api.request("GET", f"/api/children/{child_id}", cookie=self.cookie), 404, "NOT_FOUND")
 
     def test_validation_does_not_change_existing_data(self):
