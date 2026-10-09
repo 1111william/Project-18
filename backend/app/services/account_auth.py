@@ -65,6 +65,14 @@ class RegistrationChallengeStore:
             parent_id=parent_id,
         )
 
+    def create_pin_reset(self, email: str, parent_id: int) -> tuple[RegistrationChallenge, str]:
+        return self._create_challenge(
+            email=email,
+            password_hash="",
+            purpose="pin_reset",
+            parent_id=parent_id,
+        )
+
     def create_child_delete(
         self,
         email: str,
@@ -237,6 +245,38 @@ class RegistrationChallengeStore:
                 raise ApiError(
                     400,
                     "The password reset request has expired. Start again.",
+                    ErrorCode.VALIDATION_FAILED,
+                )
+            return challenge
+
+    def authorize_pin_reset(self, challenge_id: str, code: str) -> RegistrationChallenge:
+        challenge = self.verify(challenge_id, code)
+        if challenge.purpose != "pin_reset" or challenge.parent_id is None:
+            raise ApiError(
+                400,
+                "The PIN reset request is invalid.",
+                ErrorCode.VALIDATION_FAILED,
+                ["code"],
+            )
+        with self._lock:
+            challenge.reset_authorized = True
+            challenge.code_hash = ""
+        return challenge
+
+    def get_authorized_pin_reset(self, challenge_id: str) -> RegistrationChallenge:
+        now = int(time.time())
+        with self._lock:
+            challenge = self._by_id.get(challenge_id)
+            if (
+                challenge is None
+                or challenge.purpose != "pin_reset"
+                or challenge.parent_id is None
+                or not challenge.reset_authorized
+                or challenge.expires_at <= now
+            ):
+                raise ApiError(
+                    400,
+                    "The PIN reset request has expired. Start again.",
                     ErrorCode.VALIDATION_FAILED,
                 )
             return challenge

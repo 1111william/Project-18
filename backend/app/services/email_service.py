@@ -14,6 +14,7 @@ SUBJECTS = {
     "register": "Verify your Project 18 account",
     "login": "Your Project 18 login code",
     "password_reset": "Reset your Project 18 password",
+    "pin_reset": "Reset your Project 18 parent PIN",
     "child_delete": "Confirm child profile deletion",
 }
 
