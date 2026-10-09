@@ -50,9 +50,9 @@ def seed():
         db.flush()
 
         db.add_all([
-            ChildProfile(childID=1, parentID=1, nickname="Rafi", ageBand="junior", currentLevelID=1),
-            ChildProfile(childID=2, parentID=1, nickname="Mira", ageBand="senior", currentLevelID=2),
-            ChildProfile(childID=3, parentID=2, nickname="Other Child", ageBand="junior", currentLevelID=1),
+            ChildProfile(childID=1, parentID=1, nickname="Rafi", age=10, avatar="sprout"),
+            ChildProfile(childID=2, parentID=1, nickname="Mira", age=12, avatar="bunny"),
+            ChildProfile(childID=3, parentID=2, nickname="Other Child", age=11, avatar="koala"),
         ])
         db.flush()
 

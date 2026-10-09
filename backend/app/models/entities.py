@@ -54,15 +54,11 @@ class ChildProfile(Base):
         ForeignKey("Parent.parentID", ondelete="CASCADE"), nullable=False, index=True
     )
     nickname: Mapped[str] = mapped_column(String(60), nullable=False)
-    avatar: Mapped[str] = mapped_column(String(150), nullable=True)
-    ageBand: Mapped[str] = mapped_column(String(20), nullable=False, default="junior")
-    currentLevelID: Mapped[int] = mapped_column(
-        ForeignKey("LearningLevel.levelID", ondelete="SET NULL"), nullable=True, index=True
-    )
+    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    avatar: Mapped[str] = mapped_column(String(150), nullable=False, default="sprout")
     createdAt: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     parent: Mapped["Parent"] = relationship(back_populates="children")
-    level: Mapped["LearningLevel"] = relationship()
 
 
 class Lesson(Base):
