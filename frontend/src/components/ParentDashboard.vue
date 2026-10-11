@@ -1,3 +1,12 @@
+<script setup>
+import { ref } from 'vue'
+
+const showProgress = ref(false)
+const lessonsCompleted = 3
+const totalLessons = 5
+const weeklyMinutes = 45
+const weeklyGoal = 60
+</script>
 <template>
   <div>
     <h1>Parent Dashboard</h1>
@@ -9,10 +18,19 @@
       <p>Level: Beginner</p>
       <p>Time this week: 45 minutes</p>
       <p>Latest quiz: 80%</p>
-      <button>View Progress</button>
+      <button @click="showProgress = !showProgress">
+  {{ showProgress ? 'Hide Progress' : 'View Progress' }}
+</button>
     </div>
 
     <h2>Learning Progress</h2>
+    <h3>Lesson Progress</h3>
+<p>{{ lessonsCompleted }} of {{ totalLessons }} lessons completed</p>
+<progress :value="lessonsCompleted" :max="totalLessons"></progress>
+
+<h3>Weekly Learning Goal</h3>
+<p>{{ weeklyMinutes }} of {{ weeklyGoal }} minutes completed</p>
+<progress :value="weeklyMinutes" :max="weeklyGoal"></progress>
     <p>Quiz results and learning activity will be shown here.</p> 
     <h2>Weekly Learning Summary</h2>
 <p>Sample data for testing only</p>
