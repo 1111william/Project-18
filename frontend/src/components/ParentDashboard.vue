@@ -53,3 +53,56 @@ const weeklyGoal = 60
   </div>
 </template>
 
+<style scoped>
+h1 {
+  color: #2563eb;
+  font-size: 28px;
+  margin-bottom: 24px;
+}
+
+h2 {
+  color: #1e293b;
+  margin-top: 28px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+h3 {
+  color: #334155;
+  margin-top: 18px;
+}
+
+p, li {
+  color: #475569;
+  line-height: 1.7;
+}
+
+button {
+  background-color: #2563eb;
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  margin-top: 12px;
+}
+
+button:hover {
+  background-color: #1d4ed8;
+}
+
+progress {
+  width: 100%;
+  max-width: 400px;
+  height: 18px;
+  accent-color: #22c55e;
+  display: block;
+  margin: 12px 0 20px;
+}
+
+ul {
+  padding-left: 24px;
+}
+</style>
+
