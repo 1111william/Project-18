@@ -7,10 +7,15 @@ const totalLessons = 5
 const weeklyMinutes = 45
 const weeklyGoal = 60
 const latestQuizScore = 80
+const averageQuizScore = 80
+const lettersLearned = 8
+const quizzesAttempted = 2
+const lessonProgressPercentage = Math.round((lessonsCompleted / totalLessons) * 100)
+const weeklyGoalPercentage = Math.round((weeklyMinutes / weeklyGoal) * 100)
 </script>
 
 <template>
-  <div>
+  <div class="dashboard">
     <h1>Parent Dashboard</h1>
 
     <h2>Children</h2>
@@ -18,7 +23,7 @@ const latestQuizScore = 80
     <div>
       <h3>Ayaan (আয়ান)</h3>
       <p>Level: Beginner</p>
-      <p>Time this week: 45 minutes</p>
+      <p>Time this week: {{ weeklyMinutes }} minutes</p>
       <p>Latest quiz: {{ latestQuizScore }}%</p>
 
       <button @click="showProgress = !showProgress">
@@ -31,21 +36,26 @@ const latestQuizScore = 80
 
       <h3>Lesson Progress</h3>
       <p>{{ lessonsCompleted }} of {{ totalLessons }} lessons completed</p>
+      <p>Lesson completion: {{ lessonProgressPercentage }}%</p>
       <progress :value="lessonsCompleted" :max="totalLessons"></progress>
 
       <h3>Weekly Learning Goal</h3>
       <p>{{ weeklyMinutes }} of {{ weeklyGoal }} minutes completed</p>
+      <p>Weekly goal completed: {{ weeklyGoalPercentage }}%</p>
       <progress :value="weeklyMinutes" :max="weeklyGoal"></progress>
 
-      <p>Quiz results and learning activity will be shown here.</p>
+      <h3>Quiz Results</h3>
+<p>Latest quiz score: {{ latestQuizScore }}%</p>
+<p>Average quiz score: {{ averageQuizScore }}%</p>
+<p>Quizzes attempted: {{ quizzesAttempted }}</p>
 
       <h2>Weekly Learning Summary</h2>
       <p>Sample data for testing only</p>
       <ul>
-        <li>Bangla letters learned: 8</li>
-        <li>Lessons completed: 3</li>
-        <li>Quizzes attempted: 2</li>
-        <li>Average quiz score: 80%</li>
+        <li>Bangla letters learned: {{ lettersLearned }}</li>
+        <li>Lessons completed: {{ lessonsCompleted }}</li>
+        <li>Quizzes attempted: {{ quizzesAttempted }}</li>
+        <li>Average quiz score: {{ averageQuizScore }}%</li>
       </ul>
 
       <h2>Parent Recommendations</h2>
@@ -104,6 +114,33 @@ progress {
 
 ul {
   padding-left: 24px;
+}
+
+.dashboard {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 30px;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+@media (max-width: 600px) {
+  .dashboard {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  progress {
+    max-width: 100%;
+  }
 }
 </style>
 
