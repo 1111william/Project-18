@@ -6,6 +6,7 @@ const lessonsCompleted = 3
 const totalLessons = 5
 const weeklyMinutes = 45
 const weeklyGoal = 60
+const latestQuizScore = 80
 </script>
 
 <template>
@@ -18,7 +19,7 @@ const weeklyGoal = 60
       <h3>Ayaan (আয়ান)</h3>
       <p>Level: Beginner</p>
       <p>Time this week: 45 minutes</p>
-      <p>Latest quiz: 80%</p>
+      <p>Latest quiz: {{ latestQuizScore }}%</p>
 
       <button @click="showProgress = !showProgress">
         {{ showProgress ? 'Hide Progress' : 'View Progress' }}
