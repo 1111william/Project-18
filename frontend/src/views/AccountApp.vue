@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { accountApi } from '../services/accountApi'
+import { learningApi } from '../services/learningApi'
+import StudentDashboard from './StudentDashboard.vue'
 import bunnyAvatar from '../assets/avatars/bunny.png'
 import flowerAvatar from '../assets/avatars/flower.png'
 import koalaAvatar from '../assets/avatars/koala.png'
@@ -24,8 +26,13 @@ const fieldErrors = ref({})
 const busy = ref(false), booting = ref(true), challenge = ref(null), signedIn = ref(null)
 const children = ref([]), childrenLoading = ref(false)
 const studentHome = ref(null)
+const studentProgress = ref(null)
 const learningPreview = ref('')
 const studentLesson = ref('home')
+const studentExitOpen = ref(false)
+const studentExitPin = ref('')
+const studentExitError = ref('')
+const lessonCheckpointAt = ref(null)
 const currentWordIndex = ref(0)
 const wordFeedback = ref('')
 const vowelFeedback = ref('')
@@ -327,10 +334,71 @@ function openStudentHome(child) {
   cancelDeleteConfirm()
   learningPreview.value = ''
   studentLesson.value = 'home'
+  studentExitOpen.value = false
+  studentExitPin.value = ''
+  studentExitError.value = ''
   run(async () => {
-    studentHome.value = await accountApi(`/children/${child.childID}/home`)
+    const [home, progress] = await Promise.all([
+      accountApi(`/children/${child.childID}/home`),
+      learningApi.getProgress(child.childID),
+    ])
+    studentHome.value = home
+    studentProgress.value = progress
     go('student-home')
   })
+}
+async function refreshStudentLearningData() {
+  const childID = studentHome.value?.child?.childID
+  if (!childID) return
+  const [home, progress] = await Promise.all([
+    accountApi(`/children/${childID}/home`),
+    learningApi.getProgress(childID),
+  ])
+  studentHome.value = home
+  studentProgress.value = progress
+}
+function exitStudentMode() {
+  studentHome.value = null
+  studentProgress.value = null
+  learningPreview.value = ''
+  studentLesson.value = 'home'
+  studentExitOpen.value = false
+  studentExitPin.value = ''
+  studentExitError.value = ''
+  lessonCheckpointAt.value = null
+  go('login')
+}
+function requestStudentExit() {
+  studentExitError.value = ''
+  studentExitPin.value = ''
+  if (!signedIn.value?.hasPin) {
+    learningPreview.value = 'A parent PIN must be set before child mode can be exited. Return to the parent account and set a PIN first.'
+    return
+  }
+  studentExitOpen.value = true
+}
+function cancelStudentExit() {
+  studentExitOpen.value = false
+  studentExitPin.value = ''
+  studentExitError.value = ''
+}
+async function verifyStudentExit() {
+  if (!/^\d{4}$/.test(studentExitPin.value)) {
+    studentExitError.value = 'Enter the 4-digit parent PIN.'
+    return
+  }
+  if (busy.value) return
+  busy.value = true
+  studentExitError.value = ''
+  try {
+    await accountApi('/auth/pin/verify', { method: 'POST', body: { pin: studentExitPin.value } })
+    exitStudentMode()
+    notice.value = 'Child mode closed.'
+  } catch (e) {
+    studentExitError.value = e.message
+  } finally {
+    busy.value = false
+  }
 }
 function closeStudentHome() {
   if (studentLesson.value !== 'home') {
@@ -339,12 +407,57 @@ function closeStudentHome() {
     vowelFeedback.value = ''
     consonantFeedback.value = ''
     wordFeedback.value = ''
+    lessonCheckpointAt.value = null
+    refreshStudentLearningData().catch(() => {})
     nextTick(() => heading.value?.focus())
     return
   }
-  studentHome.value = null
-  learningPreview.value = ''
-  go('login')
+  requestStudentExit()
+}
+function lessonForArea(areaId) {
+  const lessons = studentHome.value?.lessons || []
+  const tests = {
+    vowels: (text) => text.includes('vowel') || text.includes('letter'),
+    consonants: (text) => text.includes('consonant'),
+    spelling: (text) => text.includes('word') || text.includes('spell') || text.includes('syllable'),
+  }
+  const test = tests[areaId]
+  if (!test) return null
+  return lessons.find((lesson) => test(`${lesson.strand || ''} ${lesson.title || ''}`.toLowerCase())) || null
+}
+function openStudentLearningArea(areaId) {
+  const area = learningAreas.find((item) => item.id === areaId)
+  if (area) {
+    previewLearningArea(area)
+    return
+  }
+  if (areaId === 'culture') {
+    learningPreview.value = 'Culture & history lessons will appear from the published lessons in the child’s current level.'
+  }
+}
+function checkpointSeconds() {
+  if (!lessonCheckpointAt.value) {
+    lessonCheckpointAt.value = Date.now()
+    return 0
+  }
+  const seconds = Math.max(0, Math.min(3600, Math.round((Date.now() - lessonCheckpointAt.value) / 1000)))
+  lessonCheckpointAt.value = Date.now()
+  return seconds
+}
+async function saveLearningCheckpoint(areaId, percentComplete, completed = false) {
+  const childID = studentHome.value?.child?.childID
+  const lesson = lessonForArea(areaId)
+  if (!childID || !lesson) return
+  try {
+    await learningApi.updateProgress(childID, lesson.lessonID, {
+      percentComplete: completed ? 100 : Math.max(0, Math.min(100, Math.round(percentComplete))),
+      secondsSpent: checkpointSeconds(),
+      completed,
+    })
+    await refreshStudentLearningData()
+  } catch (e) {
+    learningPreview.value = `Progress could not be saved yet: ${e.message}`
+  }
 }
 function previewLearningArea(area) {
   if (area.id === 'vowels') {
@@ -352,6 +465,7 @@ function previewLearningArea(area) {
     currentVowelIndex.value = 0
     learningPreview.value = ''
     vowelFeedback.value = ''
+    lessonCheckpointAt.value = Date.now()
     nextTick(() => heading.value?.focus())
     return
   }
@@ -361,6 +475,7 @@ function previewLearningArea(area) {
     currentConsonantVowelIndex.value = 0
     learningPreview.value = ''
     consonantFeedback.value = ''
+    lessonCheckpointAt.value = Date.now()
     nextTick(() => heading.value?.focus())
     return
   }
@@ -369,6 +484,7 @@ function previewLearningArea(area) {
     currentWordIndex.value = 0
     wordFeedback.value = ''
     learningPreview.value = ''
+    lessonCheckpointAt.value = Date.now()
     nextTick(() => heading.value?.focus())
     return
   }
@@ -386,12 +502,14 @@ function showNextWord() {
   if (currentWordIndex.value === wordBlendingItems.length - 1) return
   currentWordIndex.value += 1
   wordFeedback.value = ''
+  saveLearningCheckpoint('spelling', ((currentWordIndex.value + 1) / wordBlendingItems.length) * 100)
 }
 function goToWord(index) {
   currentWordIndex.value = index
   wordFeedback.value = ''
 }
 function finishWordLesson() {
+  saveLearningCheckpoint('spelling', 100, true)
   studentLesson.value = 'home'
   learningPreview.value = ''
   wordFeedback.value = ''
@@ -418,12 +536,14 @@ function showNextVowel() {
   if (currentVowelIndex.value === vowels.length - 1) return
   currentVowelIndex.value += 1
   vowelFeedback.value = ''
+  saveLearningCheckpoint('vowels', ((currentVowelIndex.value + 1) / vowels.length) * 100)
 }
 function goToVowel(index) {
   currentVowelIndex.value = index
   vowelFeedback.value = ''
 }
 function finishVowelLesson() {
+  saveLearningCheckpoint('vowels', 100, true)
   studentLesson.value = 'home'
   learningPreview.value = ''
   vowelFeedback.value = ''
@@ -446,12 +566,14 @@ function showNextConsonant() {
   if (currentConsonantIndex.value === consonants.length - 1) return
   currentConsonantIndex.value += 1
   consonantFeedback.value = ''
+  saveLearningCheckpoint('consonants', ((currentConsonantIndex.value + 1) / consonants.length) * 100)
 }
 function goToConsonant(index) {
   currentConsonantIndex.value = index
   consonantFeedback.value = ''
 }
 function finishConsonantLesson() {
+  saveLearningCheckpoint('consonants', 100, true)
   studentLesson.value = 'home'
   learningPreview.value = ''
   consonantFeedback.value = ''
@@ -895,49 +1017,35 @@ function signOut() {
                   <img class="student-nav-avatar" :class="{ custom: isCustomAvatar(studentHome.child.avatar) }" :src="avatarSource(studentHome.child.avatar)" alt="">
                   <strong>{{ studentHome.child.nickname }}</strong>
                 </div>
-                <button class="student-signout" type="button" :disabled="busy" @click="signOut">Sign out</button>
+                <button class="student-signout" type="button" :disabled="busy" @click="requestStudentExit">Exit</button>
               </div>
             </nav>
 
+            <div v-if="studentExitOpen" class="student-exit-overlay" role="presentation" @click.self="cancelStudentExit">
+              <form class="student-exit-dialog" aria-labelledby="student-exit-title" @submit.prevent="verifyStudentExit">
+                <span class="student-exit-icon" aria-hidden="true">🔒</span>
+                <h2 id="student-exit-title">Parent PIN required</h2>
+                <p>Enter the 4-digit parent PIN to leave child mode.</p>
+                <label for="student-exit-pin">Parent PIN</label>
+                <input id="student-exit-pin" v-model="studentExitPin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" maxlength="4" placeholder="••••" @input="studentExitError = ''">
+                <p v-if="studentExitError" class="error" role="alert">{{ studentExitError }}</p>
+                <div class="student-exit-actions">
+                  <button class="secondary" type="button" :disabled="busy" @click="cancelStudentExit">Cancel</button>
+                  <button class="primary" type="submit" :disabled="busy">{{ busy ? 'Checking…' : 'Exit child mode' }}</button>
+                </div>
+              </form>
+            </div>
+
             <template v-if="studentLesson === 'home'">
-              <div class="student-home-content">
-                <p v-if="learningPreview" class="learning-preview" role="status">
-                  {{ learningPreview }}
-                </p>
-
-                <header class="student-welcome">
-                  <div class="student-welcome-copy">
-                    <span class="student-eyebrow">Welcome back</span>
-                    <h1 id="page-title" ref="heading" tabindex="-1">What would you like to learn today?</h1>
-                    <p>Choose a learning area and continue your Bangla adventure.</p>
-                  </div>
-                  <div class="student-level-pill">
-                    <span>Current level</span>
-                    <strong>{{ studentHome.level?.title || studentHome.child.levelTitle || 'Getting started' }}</strong>
-                  </div>
-                  <div class="student-welcome-animation-space" aria-hidden="true"></div>
-                </header>
-
-                <div class="learning-area-heading">
-                  <div>
-                    <span class="student-eyebrow">Learning activities</span>
-                    <h2>Pick a place to begin</h2>
-                  </div>
-                  <span>4 learning areas</span>
-                </div>
-
-                <div class="learning-area-grid">
-                  <button v-for="area in learningAreas" :key="area.id" class="learning-area-card" :class="`learning-area-card--${area.tone}`" type="button" @click="previewLearningArea(area)">
-                    <span class="learning-area-symbol" aria-hidden="true">{{ area.symbol }}</span>
-                    <span class="learning-area-copy">
-                      <small>{{ area.label }}</small>
-                      <strong>{{ area.title }}</strong>
-                      <span>{{ area.description }}</span>
-                    </span>
-                    <span class="learning-area-arrow" aria-hidden="true">→</span>
-                  </button>
-                </div>
-              </div>
+              <p v-if="learningPreview" class="learning-preview" role="status">{{ learningPreview }}</p>
+              <StudentDashboard
+                :home="studentHome"
+                :progress="studentProgress"
+                :avatar-src="avatarSource(studentHome.child.avatar)"
+                :busy="busy"
+                @open-area="openStudentLearningArea"
+                @request-exit="requestStudentExit"
+              />
             </template>
 
             <template v-else-if="studentLesson === 'blending-home'">
@@ -3176,10 +3284,10 @@ button.profile-avatar-choice {
 @media (min-width: 601px) {
   .account-content.student-content:not(.student-lesson-content) {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
-    height: calc(100svh - 36px);
+    grid-template-rows: auto auto;
+    height: auto;
     max-width: none;
-    min-height: 0;
+    min-height: calc(100svh - 36px);
   }
 
   .student-content:not(.student-lesson-content) .student-home {
@@ -3889,6 +3997,53 @@ button.profile-avatar-choice {
 .single-vowel-letter.special-sign-display {
   font-size: clamp(105px, 13vw, 170px);
   letter-spacing: -.06em;
+}
+
+
+.student-exit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(28, 49, 39, .48);
+  backdrop-filter: blur(7px);
+}
+
+.student-exit-dialog {
+  width: min(430px, 100%);
+  border: 1px solid #dce5d8;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 28px 90px rgba(19, 45, 31, .24);
+  padding: 30px;
+}
+
+.student-exit-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: #eef5e8;
+  font-size: 26px;
+}
+
+.student-exit-dialog h2 {
+  margin: 18px 0 6px;
+}
+
+.student-exit-dialog > p:not(.error) {
+  margin: 0 0 18px;
+  color: #68786f;
+}
+
+.student-exit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 </style>

@@ -25,7 +25,7 @@ from backend.app.core.responses import (
 )
 from backend.app.core.security import SessionCSRFMiddleware
 from backend.app.database import get_db
-from backend.app.routers import accounts, children, quizzes
+from backend.app.routers import accounts, children, levels, quizzes
 
 
 logging.basicConfig(
@@ -181,7 +181,16 @@ app.include_router(
     prefix="/api/children",
     tags=["Children"],
 )
-
+app.include_router(
+    levels.router,
+    prefix="/api",
+    tags=["Levels"],
+)
+app.include_router(
+    levels.progress_router,
+    prefix="/api/children",
+    tags=["Progress"],
+)
 app.include_router(
     accounts.router,
     prefix="/api/auth",
