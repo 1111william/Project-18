@@ -1,22 +1,8 @@
-import os
+"""Backward-compatible import shim for the historical misspelling.
 
-from dotenv import load_dotenv
+New code must import from ``backend.app.config``.
+"""
 
-load_dotenv()
+from backend.app.config import Settings, settings
 
-
-class Settings:
-    DB_HOST = os.getenv("DB_HOST")
-    DB_PORT = os.getenv("DB_PORT")
-    DB_USER = os.getenv("DB_USER")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
-    DB_NAME = os.getenv("DB_NAME")
-
-    JWT_SECRET = os.getenv("JWT_SECRET")
-    FRONTEND_URL = os.getenv(
-        "FRONTEND_URL",
-        "http://localhost:5173"
-    )
-
-
-settings = Settings()
+__all__ = ["Settings", "settings"]
