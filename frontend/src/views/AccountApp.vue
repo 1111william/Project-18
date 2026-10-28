@@ -28,6 +28,10 @@ const learningPreview = ref('')
 const studentLesson = ref('home')
 const currentWordIndex = ref(0)
 const wordFeedback = ref('')
+const currentNumberIndex = ref(0)
+const currentConversationChapterIndex = ref(0)
+const currentConversationIndex = ref(0)
+const flippedConversationLines = ref([])
 const vowelFeedback = ref('')
 const currentVowelIndex = ref(0)
 const consonantFeedback = ref('')
@@ -72,16 +76,16 @@ const learningAreas = [
     id: 'spelling',
     title: 'Spelling & words',
     label: 'Build words',
-    description: 'Put letters together and practise useful everyday words.',
+    description: 'Build useful words and learn the Bangla digits from ০ to ৯.',
     symbol: 'শব্দ',
     tone: 'sky',
   },
   {
     id: 'conversation',
-    title: 'Basic conversations',
-    label: 'Speak & listen',
-    description: 'Learn short phrases for greetings and daily conversations.',
-    symbol: 'হ্যালো',
+    title: 'Reading & conversations',
+    label: 'Read & speak',
+    description: 'Follow textbook conversations and read short Bangla stories.',
+    symbol: 'পাঠ',
     tone: 'peach',
   },
 ]
@@ -169,6 +173,199 @@ const wordBlendingItems = [
   { id: 'phul', word: 'ফুল', parts: 'ফু + ল', ipa: '[pʰul]', romanisation: 'phul', meaning: 'flower', group: 'উ /u/ · vowel sign', illustration: wordFlower },
   { id: 'boi', word: 'বই', parts: 'ব + ই', ipa: '[boi̯]', romanisation: 'boi', meaning: 'book', group: 'ঐ /oi̯/ · vowel glide', illustration: wordBook },
 ]
+const numberItems = [
+  { digit: '০', value: 0, bangla: 'শূন্য', ipa: '[ʃunːo]', romanisation: 'shunnô', english: 'Zero' },
+  { digit: '১', value: 1, bangla: 'এক', ipa: '[æk]', romanisation: 'æk', english: 'One' },
+  { digit: '২', value: 2, bangla: 'দুই', ipa: '[d̪ui]', romanisation: 'dui', english: 'Two' },
+  { digit: '৩', value: 3, bangla: 'তিন', ipa: '[t̪in]', romanisation: 'tin', english: 'Three' },
+  { digit: '৪', value: 4, bangla: 'চার', ipa: '[tʃaɾ]', romanisation: 'char', english: 'Four' },
+  { digit: '৫', value: 5, bangla: 'পাঁচ', ipa: '[pãtʃ]', romanisation: 'pãch', english: 'Five' },
+  { digit: '৬', value: 6, bangla: 'ছয়', ipa: '[tʃʰɔj]', romanisation: 'chhôy', english: 'Six' },
+  { digit: '৭', value: 7, bangla: 'সাত', ipa: '[ʃat̪]', romanisation: 'shat', english: 'Seven' },
+  { digit: '৮', value: 8, bangla: 'আট', ipa: '[aʈ]', romanisation: 'aṭ', english: 'Eight' },
+  { digit: '৯', value: 9, bangla: 'নয়', ipa: '[nɔj]', romanisation: 'nôy', english: 'Nine' },
+]
+const conversationChapters = [
+  {
+    id: 'introduction', number: 1, banglaTitle: 'আমার পরিচয়', englishTitle: 'My introduction', sourcePages: '1–2', symbol: 'আমি', tone: 'mint',
+    description: 'Introduce yourself by sharing your name, age, class, and school name.',
+    lessons: [
+      {
+        id: 'my-name', scene: 'My name', symbol: '01',
+        lines: [
+          { speaker: 'প্রশ্ন', bangla: 'তোমার নাম কী?', ipa: '[ˈt̪omaɾ nam ki]', romanisation: 'tomar nam ki?', english: 'What is your name?' },
+          { speaker: 'উত্তর', bangla: 'আমার নাম তিথি।', ipa: '[ˈamaɾ nam ˈt̪it̪ʰi]', romanisation: 'amar nam Tithi.', english: 'My name is Tithi.' },
+        ],
+        tip: 'Use আমার নাম … to say your name.',
+      },
+      {
+        id: 'my-age', scene: 'My age', symbol: '02',
+        lines: [
+          { speaker: 'প্রশ্ন', bangla: 'তোমার বয়স কত?', ipa: '[ˈt̪omaɾ ˈbɔjoʃ ˈkɔt̪o]', romanisation: 'tomar boyosh koto?', english: 'How old are you?' },
+          { speaker: 'উত্তর', bangla: 'আমার বয়স সাত বছর।', ipa: '[ˈamaɾ ˈbɔjoʃ ʃat̪ ˈbɔtʃʰɔɾ]', romanisation: 'amar boyosh shat bochhor.', english: 'I am seven years old.' },
+        ],
+        tip: 'Use আমার বয়স … বছর to say your age.',
+      },
+      {
+        id: 'my-class', scene: 'My class', symbol: '03',
+        lines: [
+          { speaker: 'প্রশ্ন', bangla: 'তুমি কোন শ্রেণিতে পড়?', ipa: '[ˈt̪umi kon ˈsrenit̪e ˈpɔɽo]', romanisation: 'tumi kon shrenite poro?', english: 'Which class are you in?' },
+          { speaker: 'উত্তর', bangla: 'আমি দ্বিতীয় শ্রেণিতে পড়ি।', ipa: '[ˈami d̪it̪ijo ˈsrenit̪e ˈpɔɽi]', romanisation: 'ami ditiyo shrenite pori.', english: 'I am in Class Two.' },
+        ],
+        tip: 'Use আমি … শ্রেণিতে পড়ি to say your class.',
+      },
+      {
+        id: 'my-school', scene: 'My school', symbol: '04',
+        lines: [
+          { speaker: 'প্রশ্ন', bangla: 'তোমার বিদ্যালয়ের নাম কী?', ipa: '[ˈt̪omaɾ bid̪d̪alɔjeɾ nam ki]', romanisation: 'tomar bidyaloyer nam ki?', english: 'What is the name of your school?' },
+          { speaker: 'উত্তর', bangla: 'আমার বিদ্যালয়ের নাম ______।', ipa: '[ˈamaɾ bid̪d̪alɔjeɾ nam ...]', romanisation: 'amar bidyaloyer nam ______.', english: 'My school’s name is ______.' },
+        ],
+        tip: 'Complete the sentence with the name of your school.',
+      },
+    ],
+  },
+  {
+    id: 'school-feelings', number: 2, banglaTitle: 'স্কুলে কেমন লাগছে', englishTitle: 'How school feels', sourcePages: '3–5', symbol: 'স্কুল', tone: 'sky',
+    description: 'Talk about feelings, favourite activities, school competitions, and returning to class.',
+    lessons: [
+      {
+        id: 'feelings', scene: 'Talking about school', symbol: '01',
+        lines: [
+          { speaker: 'বন্ধু', bangla: 'স্কুলে এসে তোমার কেমন লাগছে?', ipa: '[ˈskule ˈeʃe ˈt̪omaɾ ˈkɛmon ˈlaɡtʃʰe]', romanisation: 'skule eshe tomar kemon lagchhe?', english: 'How do you feel after coming to school?' },
+          { speaker: 'আমি', bangla: 'অনেক খুশি লাগছে।', ipa: '[ˈɔnɛk ˈkʰuʃi ˈlaɡtʃʰe]', romanisation: 'onek khushi lagchhe.', english: 'I feel very happy.' },
+        ],
+        tip: 'Change খুশি (happy) to another feeling word when you answer.',
+      },
+      {
+        id: 'hobbies', scene: 'Sharing favourite activities', symbol: '02',
+        lines: [
+          { speaker: 'মিতু', bangla: 'আমি মিতু। আমি গান গাইতে পছন্দ করি।', ipa: '[ˈami ˈmit̪u | ˈami ˈɡan ˈɡait̪e ˈpɔtʃʰɔnd̪o ˈkoɾi]', romanisation: 'ami Mitu. ami gan gaite pochhondo kori.', english: 'I am Mitu. I like to sing.' },
+          { speaker: 'রাজু', bangla: 'আমি রাজু। আমার ছবি আঁকতে ভালো লাগে।', ipa: '[ˈami ˈɾaɟu | ˈamaɾ ˈtʃʰobi ˈãkt̪e ˈbʱalo ˈlaɡe]', romanisation: 'ami Raju. amar chhobi ankte bhalo lage.', english: 'I am Raju. I like drawing pictures.' },
+          { speaker: 'তিথি', bangla: 'আমি তিথি। আমি খেলতে পছন্দ করি।', ipa: '[ˈami ˈt̪it̪ʰi | ˈami ˈkʰelt̪e ˈpɔtʃʰɔnd̪o ˈkoɾi]', romanisation: 'ami Tithi. ami khelte pochhondo kori.', english: 'I am Tithi. I like to play.' },
+          { speaker: 'বিমিত', bangla: 'আমি বিমিত। আমি পড়তে ভালোবাসি।', ipa: '[ˈami ˈbimit̪ | ˈami ˈpɔɽt̪e bʱalobaʃi]', romanisation: 'ami Bimit. ami porte bhalobashi.', english: 'I am Bimit. I love to read.' },
+        ],
+        tip: 'Use পছন্দ করি or ভালো লাগে to say what you enjoy doing.',
+      },
+      {
+        id: 'competitions', scene: 'School competitions', symbol: '03',
+        lines: [
+          { speaker: 'মিতু', bangla: 'জানো, বিদ্যালয়ে খেলাধুলার প্রতিযোগিতা হবে?', ipa: '[ˈɟano bid̪d̪alɔje kʰelad̪ʱulaɾ pɾot̪iɟoɡit̪a hɔbe]', romanisation: 'jano, bidyaloye kheladhular protijogita hobe?', english: 'Did you know there will be a sports competition at school?' },
+          { speaker: 'রাজু', bangla: 'গান আর ছবি আঁকার প্রতিযোগিতাও হবে।', ipa: '[ɡan aɾ tʃʰobi ãkaɾ pɾot̪iɟoɡit̪ao hɔbe]', romanisation: 'gan ar chhobi ankar protijogitao hobe.', english: 'There will also be singing and drawing competitions.' },
+        ],
+        tip: 'প্রতিযোগিতা means “competition”.',
+      },
+      {
+        id: 'choosing-activities', scene: 'Choosing activities', symbol: '04',
+        lines: [
+          { speaker: 'তিথি', bangla: 'আমি দৌড়ে লাফ দেব। তুমি?', ipa: '[ˈami d̪ouɽe lapʰ d̪ebo | ˈt̪umi]', romanisation: 'ami doure laf debo. tumi?', english: 'I will run and jump. And you?' },
+          { speaker: 'বিমিত', bangla: 'আমি ছবি আঁকব। পাহাড়ের ছবি।', ipa: '[ˈami tʃʰobi ãkbo | pahaɽeɾ tʃʰobi]', romanisation: 'ami chhobi ankbo. paharer chhobi.', english: 'I will draw a picture—a picture of a mountain.' },
+          { speaker: 'মিতু', bangla: 'আমি একটা দেশের গান গাইব।', ipa: '[ˈami ɛkʈa d̪eʃeɾ ɡan ɡaibo]', romanisation: 'ami ekta desher gan gaibo.', english: 'I will sing a patriotic song.' },
+          { speaker: 'রাজু', bangla: 'আমি ছড়া বলব।', ipa: '[ˈami tʃʰɔɽa bolbo]', romanisation: 'ami chhora bolbo.', english: 'I will recite a rhyme.' },
+        ],
+        tip: 'The classmates choose different competition activities.',
+      },
+      {
+        id: 'back-to-class', scene: 'Returning to class', symbol: '05',
+        lines: [
+          { speaker: 'তিথি', bangla: 'দারুণ, খুব ভালো হবে।', ipa: '[d̪aɾun kʰub bʱalo hɔbe]', romanisation: 'darun, khub bhalo hobe.', english: 'Great, it will be very good.' },
+          { speaker: 'মিতু', bangla: 'ওই যে ঘণ্টা পড়ল। চলো, ক্লাসে যাই।', ipa: '[oi dʒe ɡʱɔnʈa pɔɽlo | tʃɔlo klase dʒai]', romanisation: 'oi je ghonta porlo. cholo, klase jai.', english: 'The bell has rung. Come on, let’s go to class.' },
+        ],
+        tip: 'চলো means “let’s go”.',
+      },
+    ],
+  },
+  {
+    id: 'home-work', number: 3, banglaTitle: 'আমার বাড়ি আমার কাজ', englishTitle: 'My home, my work', sourcePages: '6', symbol: 'বাড়ি', tone: 'sun',
+    description: 'Follow a family conversation about housework, shopping, and helping one another.',
+    lessons: [
+      {
+        id: 'plans', scene: 'Planning the work', symbol: '01',
+        lines: [
+          { speaker: 'মা', bangla: 'আজ অনেক কাজ করতে হবে।', ipa: '[aɟ ˈɔnɛk kaɟ ˈkoɾt̪e ˈhɔbe]', romanisation: 'aj onek kaj korte hobe.', english: 'There is a lot of work to do today.' },
+          { speaker: 'তুলি', bangla: 'কী কাজ, মা?', ipa: '[ki kaɟ | ma]', romanisation: 'ki kaj, ma?', english: 'What work, Mother?' },
+          { speaker: 'মা', bangla: 'ঘর-বাড়ি পরিষ্কার করতে হবে। কাপড় গোছাতে হবে।', ipa: '[ɡʱɔɾ ˈbaɽi pɔɾiʃˈkaɾ ˈkoɾt̪e ˈhɔbe | ˈkapɔɽ ˈɡotʃʰat̪e ˈhɔbe]', romanisation: 'ghor-bari porishkar korte hobe. kapor gochhate hobe.', english: 'The house must be cleaned. The clothes must be arranged.' },
+        ],
+        tip: 'Mother explains which household jobs need to be done.',
+      },
+      {
+        id: 'market-plan', scene: 'Going to the market', symbol: '02',
+        lines: [
+          { speaker: 'তপু', bangla: 'আমিও কাজ করব।', ipa: '[ˈamio kaɟ ˈkoɾbo]', romanisation: 'amio kaj korbo.', english: 'I will help with the work too.' },
+          { speaker: 'বাবা', bangla: 'আজ তো বাজারেও যেতে হবে।', ipa: '[aɟ t̪o badʒaɾeo dʒet̪e hɔbe]', romanisation: 'aj to bajareo jete hobe.', english: 'We also have to go to the market today.' },
+          { speaker: 'তপু', bangla: 'আমি তাহলে বাবার সঙ্গে বাজারে যাই।', ipa: '[ˈami t̪ahole babaɾ ʃɔŋɡe badʒaɾe dʒai]', romanisation: 'ami tahole babar shonge bajare jai.', english: 'Then I will go to the market with Father.' },
+        ],
+        tip: 'Topu offers to go to the market with Father.',
+      },
+      {
+        id: 'helping-mother', scene: 'Helping mother', symbol: '03',
+        lines: [
+          { speaker: 'তুলি', bangla: 'আমি তবে মার সঙ্গে কাজ করি।', ipa: '[ˈami t̪obe maɾ ʃɔŋɡe kaɟ koɾi]', romanisation: 'ami tobe mar shonge kaj kori.', english: 'Then I will work with Mother.' },
+          { speaker: 'বাবা', bangla: 'কী করবে?', ipa: '[ki koɾbe]', romanisation: 'ki korbe?', english: 'What will you do?' },
+          { speaker: 'তুলি', bangla: 'ঘর পরিষ্কার করব। কাপড় গোছাব।', ipa: '[ɡʱɔɾ pɔɾiʃkaɾ koɾbo | kapɔɽ ɡotʃʰabo]', romanisation: 'ghor porishkar korbo. kapor gochhabo.', english: 'I will clean the house and arrange the clothes.' },
+        ],
+        tip: 'Tuli explains how she will help Mother.',
+      },
+      {
+        id: 'together', scene: 'Working together', symbol: '04',
+        lines: [
+          { speaker: 'মা', bangla: 'ঠিক আছে। সবাই মিলে কাজ করব।', ipa: '[ˈʈʰik ˈatʃʰe | ˈʃɔbai ˈmile kaɟ ˈkoɾbo]', romanisation: 'thik ache. shobai mile kaj korbo.', english: 'All right. We will all work together.' },
+          { speaker: 'বাবা', bangla: 'মিলেমিশে করলে কাজ সহজ হয়।', ipa: '[mileˈmiʃe ˈkoɾle kaɟ ˈʃɔhoɟ hɔe̯]', romanisation: 'milemishe korle kaj shohoj hoy.', english: 'Work becomes easier when everyone works together.' },
+        ],
+        tip: 'The lesson ends with the idea that shared work is easier.',
+      },
+    ],
+  },
+  {
+    id: 'dalim-kumar', number: 4, format: 'article', banglaTitle: 'ডালিমকুমার ও কঙ্কাবতী', englishTitle: 'Dalim Kumar and Kankabati', sourcePages: '7–11', symbol: 'গল্প', tone: 'peach',
+    description: 'Read the story of a prince, a captive princess, and a brave rescue from the demon’s land.',
+    lessons: [
+      {
+        id: 'the-wandering-prince', scene: 'The wandering prince', symbol: '01', banglaHeading: 'রাজপুত্রের যাত্রা',
+        paragraphs: [
+          { bangla: 'এক ছিল রাজপুত্র। তার নাম ডালিমকুমার।', english: 'Once there was a prince. His name was Dalim Kumar.' },
+          { bangla: 'তার ছিল এক পক্ষীরাজ ঘোড়া। ঘোড়ায় চড়ে সে দেশে-বিদেশে ঘুরে বেড়াত।', english: 'He had a winged horse. He rode it and travelled through many lands.' },
+          { bangla: 'একবার ঘুরতে ঘুরতে অচিনপুরে চলে এলো। সে অনেক ক্লান্ত বোধ করল। সে গাছের ছায়ায় ঘুমিয়ে পড়ল।', english: 'One day he arrived in an unknown land. Feeling very tired, he fell asleep in the shade of a tree.' },
+          { bangla: 'ওই গাছে থাকত ব্যাঙ্গমা আর ব্যাঙ্গমি। তারা কথা বলছিল।', english: 'Byangama and Byangami lived in that tree. They were talking.' },
+        ],
+      },
+      {
+        id: 'the-captive-princess', scene: 'The captive princess', symbol: '02', banglaHeading: 'বন্দি রাজকন্যা',
+        paragraphs: [
+          { bangla: 'ডালিমকুমারের ঘুম ভেঙে গেল। ব্যাঙ্গমা বলল, “রাজকন্যা কঙ্কাবতীর কী হয়েছে জানো?”', english: 'Dalim Kumar woke up. Byangama asked, “Do you know what has happened to Princess Kankabati?”' },
+          { bangla: 'ব্যাঙ্গমি বলল, “সে এখন রাক্ষসপুরীতে বন্দি।” ব্যাঙ্গমা বলল, “কী সর্বনাশ!”', english: 'Byangami said, “She is being held captive in the demon’s land.” Byangama cried, “What a disaster!”' },
+          { bangla: 'রাক্ষসপুরী অনেক দূরে। সাত সাগর তেরো নদীর ওপারে।', english: 'The demon’s land was very far away, beyond seven seas and thirteen rivers.' },
+          { bangla: 'ডালিমকুমার সাত সাগর তেরো নদী পার হলো। তারপর রাক্ষসপুরীতে পৌঁছাল।', english: 'Dalim Kumar crossed seven seas and thirteen rivers. Then he reached the demon’s land.' },
+        ],
+      },
+      {
+        id: 'the-magic-sticks', scene: 'The magic sticks', symbol: '03', banglaHeading: 'সোনার ও রূপার কাঠি',
+        paragraphs: [
+          { bangla: 'তখন রাজকন্যা কঙ্কাবতী সোনার পালঙ্কে ঘুমিয়ে আছে। কিছুতেই তার ঘুম ভাঙে না।', english: 'Princess Kankabati was asleep on a golden bed. Nothing could wake her.' },
+          { bangla: 'ডালিমকুমার দেখতে পেল কঙ্কাবতীর মাথার কাছে রূপার কাঠি। আর পায়ের কাছে সোনার কাঠি।', english: 'Dalim Kumar saw a silver stick near her head and a golden stick near her feet.' },
+          { bangla: 'তখন ডালিমকুমার মাথার কাছে সোনার কাঠি নিয়ে এলো। আর পায়ের কাছে নিয়ে এলো রূপার কাঠি।', english: 'He placed the golden stick near her head and the silver stick near her feet.' },
+          { bangla: 'অমনি কঙ্কাবতী জেগে উঠল।', english: 'At once, Kankabati woke up.' },
+        ],
+      },
+      {
+        id: 'the-demon-arrives', scene: 'The demon arrives', symbol: '04', banglaHeading: 'রাক্ষসের আগমন',
+        paragraphs: [
+          { bangla: 'ঠিক তখনই রাক্ষস ঘরে ঢুকল।', english: 'Just then, the demon entered the room.' },
+          { bangla: 'সাথে সাথে ডালিমকুমার তরবারি বের করল।', english: 'Dalim Kumar immediately drew his sword.' },
+          { bangla: 'কঙ্কাবতী বলল, “রাক্ষসের প্রাণ আছে একটা টিনের কৌটার ভেতরে।”', english: 'Kankabati said, “The demon’s life is hidden inside a tin box.”' },
+          { bangla: 'ডালিমকুমার জানে না সেই কৌটা কোথায়।', english: 'Dalim Kumar did not know where the box was.' },
+        ],
+      },
+      {
+        id: 'the-rescue', scene: 'The rescue', symbol: '05', banglaHeading: 'সাহসী কঙ্কাবতী',
+        paragraphs: [
+          { bangla: 'কঙ্কাবতীর ছিল অনেক সাহস। সে তখন পালঙ্কের নিচ থেকে একটা কৌটা বের করল।', english: 'Kankabati was very brave. She took a box from beneath the bed.' },
+          { bangla: 'কৌটা খুলতেই বেরিয়ে এলো একটা ভ্রমর। তখন কঙ্কাবতী তরবারি দিয়ে ভ্রমরটাকে কেটে ফেলল।', english: 'When she opened the box, a bumblebee flew out. Kankabati cut it down with the sword.' },
+          { bangla: 'তারপর ডালিমকুমার ও কঙ্কাবতী বেরিয়ে এলো রাক্ষসপুরী থেকে।', english: 'Then Dalim Kumar and Kankabati escaped from the demon’s land.' },
+        ],
+      },
+    ],
+  },
+]
 const consonants = [
   { letter: 'ক', ipa: '[kɔ]', romanisation: 'ka', tipTitle: 'Use a clean, unaspirated “k”', tip: 'It is like the “k” in “skate”. Keep the sound short and do not release a strong puff of air.' },
   { letter: 'খ', ipa: '[kʰɔ]', romanisation: 'kha', tipTitle: 'Add a clear puff after “k”', tip: 'Begin with ক, then release a noticeable breath. Hold a hand in front of your mouth to feel the air.' },
@@ -214,6 +411,12 @@ const currentVowel = computed(() => vowels[currentVowelIndex.value])
 const currentVowelNumber = computed(() => currentVowelIndex.value + 1)
 const currentWord = computed(() => wordBlendingItems[currentWordIndex.value])
 const currentWordNumber = computed(() => currentWordIndex.value + 1)
+const currentNumber = computed(() => numberItems[currentNumberIndex.value])
+const currentNumberNumber = computed(() => currentNumberIndex.value + 1)
+const currentConversationChapter = computed(() => conversationChapters[currentConversationChapterIndex.value])
+const currentConversationLessons = computed(() => currentConversationChapter.value.lessons)
+const currentConversation = computed(() => currentConversationLessons.value[currentConversationIndex.value])
+const currentConversationNumber = computed(() => currentConversationIndex.value + 1)
 const currentConsonant = computed(() => consonants[currentConsonantIndex.value])
 const currentConsonantNumber = computed(() => currentConsonantIndex.value + 1)
 const currentConsonantCanBlend = computed(() => currentConsonant.value.category !== 'special' && currentConsonant.value.letter !== 'ৎ')
@@ -230,6 +433,12 @@ const isChildCreate = computed(() => !!signedIn.value && page.value === 'child-c
 const isChildEdit = computed(() => isChildCreate.value && editingChildId.value !== null)
 const isStudentHome = computed(() => !!signedIn.value && page.value === 'student-home')
 const isProfilesHome = computed(() => !!signedIn.value && page.value === 'login')
+const studentBackLabel = computed(() => {
+  if (studentLesson.value === 'home') return 'Child profiles'
+  if (studentLesson.value === 'blending-home' || studentLesson.value === 'numbers') return 'Spelling & words'
+  if (studentLesson.value === 'conversations') return 'Reading & conversations'
+  return 'Learning home'
+})
 const isParentPinSet = computed(() => !!signedIn.value && page.value === 'parent-pin-set')
 const isParentPinVerify = computed(() => !!signedIn.value && page.value === 'parent-pin')
 const isParentPinForgot = computed(() => !!signedIn.value && page.value === 'parent-pin-forgot')
@@ -334,11 +543,18 @@ function openStudentHome(child) {
 }
 function closeStudentHome() {
   if (studentLesson.value !== 'home') {
-    studentLesson.value = 'home'
+    if (studentLesson.value === 'blending-home' || studentLesson.value === 'numbers') {
+      studentLesson.value = 'spelling-home'
+    } else if (studentLesson.value === 'conversations') {
+      studentLesson.value = 'conversation-home'
+    } else {
+      studentLesson.value = 'home'
+    }
     learningPreview.value = ''
     vowelFeedback.value = ''
     consonantFeedback.value = ''
     wordFeedback.value = ''
+    flippedConversationLines.value = []
     nextTick(() => heading.value?.focus())
     return
   }
@@ -365,14 +581,42 @@ function previewLearningArea(area) {
     return
   }
   if (area.id === 'spelling') {
-    studentLesson.value = 'blending-home'
+    studentLesson.value = 'spelling-home'
     currentWordIndex.value = 0
+    currentNumberIndex.value = 0
     wordFeedback.value = ''
     learningPreview.value = ''
     nextTick(() => heading.value?.focus())
     return
   }
+  if (area.id === 'conversation') {
+    studentLesson.value = 'conversation-home'
+    currentConversationChapterIndex.value = 0
+    currentConversationIndex.value = 0
+    flippedConversationLines.value = []
+    learningPreview.value = ''
+    nextTick(() => heading.value?.focus())
+    return
+  }
   learningPreview.value = `${area.title} activities will be connected in the next learning step.`
+}
+function openConversationChapter(index) {
+  currentConversationChapterIndex.value = index
+  currentConversationIndex.value = 0
+  flippedConversationLines.value = []
+  studentLesson.value = 'conversations'
+  nextTick(() => heading.value?.focus())
+}
+function openWordLesson() {
+  studentLesson.value = 'blending-home'
+  currentWordIndex.value = 0
+  wordFeedback.value = ''
+  nextTick(() => heading.value?.focus())
+}
+function openNumberLesson() {
+  studentLesson.value = 'numbers'
+  currentNumberIndex.value = 0
+  nextTick(() => heading.value?.focus())
 }
 function previewWordSound() {
   wordFeedback.value = `Pronunciation audio for ${currentWord.value.word} will be added here later.`
@@ -392,10 +636,64 @@ function goToWord(index) {
   wordFeedback.value = ''
 }
 function finishWordLesson() {
-  studentLesson.value = 'home'
+  studentLesson.value = 'spelling-home'
   learningPreview.value = ''
   wordFeedback.value = ''
   completedLesson.value = 'Bangla words'
+  clearTimeout(lessonCompletionTimer)
+  lessonCompletionTimer = setTimeout(() => {
+    completedLesson.value = ''
+  }, 2400)
+  nextTick(() => heading.value?.focus())
+}
+function showPreviousNumber() {
+  if (currentNumberIndex.value === 0) return
+  currentNumberIndex.value -= 1
+}
+function showNextNumber() {
+  if (currentNumberIndex.value === numberItems.length - 1) return
+  currentNumberIndex.value += 1
+}
+function goToNumber(index) {
+  currentNumberIndex.value = index
+}
+function finishNumberLesson() {
+  studentLesson.value = 'spelling-home'
+  learningPreview.value = ''
+  completedLesson.value = 'Bangla numbers'
+  clearTimeout(lessonCompletionTimer)
+  lessonCompletionTimer = setTimeout(() => {
+    completedLesson.value = ''
+  }, 2400)
+  nextTick(() => heading.value?.focus())
+}
+function showPreviousConversation() {
+  if (currentConversationIndex.value === 0) return
+  currentConversationIndex.value -= 1
+  flippedConversationLines.value = []
+}
+function showNextConversation() {
+  if (currentConversationIndex.value === currentConversationLessons.value.length - 1) return
+  currentConversationIndex.value += 1
+  flippedConversationLines.value = []
+}
+function goToConversation(index) {
+  currentConversationIndex.value = index
+  flippedConversationLines.value = []
+}
+function isConversationLineFlipped(index) {
+  return flippedConversationLines.value.includes(index)
+}
+function toggleConversationLine(index) {
+  flippedConversationLines.value = isConversationLineFlipped(index)
+    ? flippedConversationLines.value.filter((lineIndex) => lineIndex !== index)
+    : [...flippedConversationLines.value, index]
+}
+function finishConversationLesson() {
+  studentLesson.value = 'conversation-home'
+  flippedConversationLines.value = []
+  learningPreview.value = ''
+  completedLesson.value = `Chapter ${currentConversationChapter.value.number}: ${currentConversationChapter.value.englishTitle}`
   clearTimeout(lessonCompletionTimer)
   lessonCompletionTimer = setTimeout(() => {
     completedLesson.value = ''
@@ -888,7 +1186,7 @@ function signOut() {
             <nav class="student-nav" aria-label="Student navigation">
               <button class="student-brand" type="button" @click="closeStudentHome">
                 <span class="student-brand-mark" aria-hidden="true">অ</span>
-                <span><strong>Bangla Learning</strong><small>← {{ studentLesson === 'home' ? 'Child profiles' : 'Learning home' }}</small></span>
+                <span><strong>Bangla Learning</strong><small>← {{ studentBackLabel }}</small></span>
               </button>
               <div class="student-nav-account">
                 <div class="student-identity">
@@ -938,6 +1236,41 @@ function signOut() {
                   </button>
                 </div>
               </div>
+            </template>
+
+            <template v-else-if="studentLesson === 'spelling-home'">
+              <section class="spelling-module-home" aria-labelledby="spelling-module-title">
+                <header class="spelling-module-header">
+                  <div>
+                    <span class="student-eyebrow">Spelling &amp; numbers</span>
+                    <h1 id="spelling-module-title" ref="heading" tabindex="-1">Choose a learning module</h1>
+                    <p>Build familiar Bangla words or learn the Bangla digits from ০ to ৯.</p>
+                  </div>
+                  <span class="spelling-module-count">2 modules</span>
+                </header>
+
+                <div class="spelling-module-grid">
+                  <button class="spelling-module-card spelling-module-card--words" type="button" @click="openWordLesson">
+                    <span class="spelling-module-symbol" lang="bn" aria-hidden="true">শব্দ</span>
+                    <span class="spelling-module-copy">
+                      <small>Build words</small>
+                      <strong>Word spelling</strong>
+                      <span>Blend letters and vowel signs to read 12 useful illustrated words.</span>
+                    </span>
+                    <span class="spelling-module-arrow" aria-hidden="true">→</span>
+                  </button>
+
+                  <button class="spelling-module-card spelling-module-card--numbers" type="button" @click="openNumberLesson">
+                    <span class="spelling-module-symbol" lang="bn" aria-hidden="true">১২৩</span>
+                    <span class="spelling-module-copy">
+                      <small>Learn digits</small>
+                      <strong>Numbers</strong>
+                      <span>Match Bangla digits ০–৯ with their names and number values.</span>
+                    </span>
+                    <span class="spelling-module-arrow" aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </section>
             </template>
 
             <template v-else-if="studentLesson === 'blending-home'">
@@ -1006,6 +1339,188 @@ function signOut() {
                 </article>
               </div>
               <p v-if="wordFeedback" class="vowel-feedback" role="status">{{ wordFeedback }}</p>
+            </template>
+
+            <template v-else-if="studentLesson === 'numbers'">
+              <div class="vowel-lesson-stage number-lesson-stage">
+                <aside class="vowel-sidebar-progress consonant-progress-rail" :aria-label="`Number learning progress: ${currentNumberNumber} of ${numberItems.length}`">
+                  <span>Number progress</span>
+                  <strong>{{ currentNumberNumber }} / {{ numberItems.length }}</strong>
+                  <div class="consonant-dot-track" :style="{ '--lesson-steps': numberItems.length }" role="navigation" aria-label="Jump to a number">
+                    <button
+                      v-for="(number, index) in numberItems"
+                      :key="number.value"
+                      class="consonant-progress-dot"
+                      :class="{ completed: index < currentNumberIndex, current: index === currentNumberIndex }"
+                      type="button"
+                      :aria-label="`Number ${number.value}: ${number.bangla}`"
+                      :aria-current="index === currentNumberIndex ? 'step' : undefined"
+                      :title="`${number.digit} · ${number.english}`"
+                      @click="goToNumber(index)"
+                    ></button>
+                  </div>
+                </aside>
+
+                <article class="single-vowel-card number-lesson-card" aria-labelledby="number-lesson-title" aria-live="polite">
+                  <div class="single-vowel-topline number-lesson-topline">
+                    <span class="student-eyebrow">সংখ্যা · Number {{ String(currentNumberNumber).padStart(2, '0') }}</span>
+                    <span>০–৯</span>
+                  </div>
+
+                  <div class="number-lesson-main">
+                    <div class="number-bengali-digit" lang="bn">{{ currentNumber.digit }}</div>
+
+                    <div class="number-lesson-copy">
+                      <span>Bangla number name</span>
+                      <h1 id="number-lesson-title" ref="heading" tabindex="-1" lang="bn">{{ currentNumber.bangla }}</h1>
+                      <div class="number-ipa-row"><strong>{{ currentNumber.ipa }}</strong></div>
+                      <small>Romanised as “{{ currentNumber.romanisation }}”</small>
+                      <p>{{ currentNumber.english }}</p>
+                    </div>
+                  </div>
+
+                  <div class="pronunciation-tip number-match-tip">
+                    <span class="pronunciation-tip-icon" aria-hidden="true">০↔0</span>
+                    <div>
+                      <span class="student-eyebrow">Match the digits</span>
+                      <h2><span lang="bn">{{ currentNumber.digit }}</span> means {{ currentNumber.value }}</h2>
+                      <p>The Bangla digit <strong lang="bn">{{ currentNumber.digit }}</strong> represents the same number as <strong>{{ currentNumber.value }}</strong>. Its Bangla name is <strong lang="bn">{{ currentNumber.bangla }}</strong>.</p>
+                    </div>
+                  </div>
+
+                  <nav class="vowel-pagination" aria-label="Number pagination">
+                    <button type="button" :disabled="currentNumberIndex === 0" aria-label="Previous number" title="Previous number" @click="showPreviousNumber">
+                      <span aria-hidden="true">◀</span>
+                    </button>
+                    <span>{{ currentNumberNumber }}/{{ numberItems.length }}</span>
+                    <button type="button" :aria-label="currentNumberIndex === numberItems.length - 1 ? 'Finish number lesson' : 'Next number'" :title="currentNumberIndex === numberItems.length - 1 ? 'Finish number lesson' : 'Next number'" @click="currentNumberIndex === numberItems.length - 1 ? finishNumberLesson() : showNextNumber()">
+                      <span aria-hidden="true">▶</span>
+                    </button>
+                  </nav>
+                </article>
+              </div>
+            </template>
+
+            <template v-else-if="studentLesson === 'conversation-home'">
+              <section class="conversation-chapter-home" aria-labelledby="conversation-chapter-title">
+                <header class="conversation-chapter-header">
+                  <div>
+                    <span class="student-eyebrow">Textbook lessons</span>
+                    <h1 id="conversation-chapter-title" ref="heading" tabindex="-1">Choose a chapter</h1>
+                    <p>Follow conversations and stories in the same order as the Grade 2 Bangla textbook.</p>
+                  </div>
+                  <span class="conversation-chapter-count">{{ conversationChapters.length }} chapters</span>
+                </header>
+
+                <div class="conversation-chapter-grid">
+                  <button
+                    v-for="(chapter, index) in conversationChapters"
+                    :key="chapter.id"
+                    class="conversation-chapter-card"
+                    :class="`conversation-chapter-card--${chapter.tone}`"
+                    type="button"
+                    @click="openConversationChapter(index)"
+                  >
+                    <span class="conversation-chapter-number">{{ String(chapter.number).padStart(2, '0') }}</span>
+                    <span class="conversation-chapter-copy">
+                      <small>Chapter {{ chapter.number }} · Textbook pages {{ chapter.sourcePages }}</small>
+                      <strong lang="bn">{{ chapter.banglaTitle }}</strong>
+                      <b>{{ chapter.englishTitle }}</b>
+                      <span>{{ chapter.description }}</span>
+                    </span>
+                    <span class="conversation-chapter-meta">
+                      <b>{{ chapter.lessons.length }}</b>
+                      <small>{{ chapter.format === 'article' ? 'sections' : 'parts' }}</small>
+                      <i aria-hidden="true">→</i>
+                    </span>
+                  </button>
+                </div>
+              </section>
+            </template>
+
+            <template v-else-if="studentLesson === 'conversations'">
+              <div class="vowel-lesson-stage conversation-lesson-stage">
+                <aside class="vowel-sidebar-progress consonant-progress-rail" :aria-label="`Chapter ${currentConversationChapter.number} progress: ${currentConversationNumber} of ${currentConversationLessons.length}`">
+                  <span>{{ currentConversationChapter.format === 'article' ? 'Reading progress' : 'Conversation progress' }}</span>
+                  <strong>{{ currentConversationNumber }} / {{ currentConversationLessons.length }}</strong>
+                  <div class="consonant-dot-track" :style="{ '--lesson-steps': currentConversationLessons.length }" role="navigation" aria-label="Jump to a conversation">
+                    <button
+                      v-for="(conversation, index) in currentConversationLessons"
+                      :key="conversation.id"
+                      class="consonant-progress-dot"
+                      :class="{ completed: index < currentConversationIndex, current: index === currentConversationIndex }"
+                      type="button"
+                      :aria-label="`${currentConversationChapter.format === 'article' ? 'Reading section' : 'Conversation'} ${index + 1}: ${conversation.scene}`"
+                      :aria-current="index === currentConversationIndex ? 'step' : undefined"
+                      :title="`${index + 1}. ${conversation.scene}`"
+                      @click="goToConversation(index)"
+                    ></button>
+                  </div>
+                </aside>
+
+                <article class="single-vowel-card conversation-lesson-card" aria-labelledby="conversation-lesson-title" aria-live="polite">
+                  <div class="single-vowel-topline conversation-lesson-topline">
+                    <span class="student-eyebrow">Chapter {{ currentConversationChapter.number }} · {{ currentConversationChapter.format === 'article' ? 'Section' : 'Part' }} {{ currentConversationNumber }}</span>
+                    <span>{{ currentConversationChapter.englishTitle }}</span>
+                  </div>
+
+                  <section v-if="currentConversationChapter.format === 'article'" id="conversation-lesson-title" ref="heading" class="story-reading-main" tabindex="-1">
+                    <span class="student-eyebrow">Reading passage</span>
+                    <h1 lang="bn">{{ currentConversation.banglaHeading }}</h1>
+                    <div class="story-bangla-text">
+                      <p v-for="paragraph in currentConversation.paragraphs" :key="paragraph.bangla" lang="bn">{{ paragraph.bangla }}</p>
+                    </div>
+                    <details class="story-translation">
+                      <summary>English translation</summary>
+                      <div>
+                        <p v-for="paragraph in currentConversation.paragraphs" :key="paragraph.english">{{ paragraph.english }}</p>
+                      </div>
+                    </details>
+                  </section>
+
+                  <div v-else id="conversation-lesson-title" ref="heading" class="conversation-lesson-main conversation-chat-area" tabindex="-1">
+
+                        <div
+                          v-for="(line, lineIndex) in currentConversation.lines"
+                          :key="`${currentConversation.id}-${line.speaker}`"
+                          class="conversation-message-row"
+                          :class="{ 'conversation-message-row--sent': lineIndex % 2 === 1 }"
+                        >
+                          <span class="conversation-message-avatar" aria-hidden="true">{{ lineIndex % 2 === 0 ? 'A' : 'B' }}</span>
+                          <button
+                            class="conversation-flashcard"
+                            :class="{ flipped: isConversationLineFlipped(lineIndex) }"
+                            type="button"
+                            :aria-pressed="isConversationLineFlipped(lineIndex)"
+                            :aria-label="`${isConversationLineFlipped(lineIndex) ? 'Show Bangla' : 'Show translation and pronunciation'} for ${line.bangla}`"
+                            @click="toggleConversationLine(lineIndex)"
+                          >
+                            <span class="conversation-flashcard-inner">
+                              <span class="conversation-flashcard-face conversation-flashcard-front">
+                                <strong lang="bn">{{ line.bangla }}</strong>
+                              </span>
+                              <span class="conversation-flashcard-face conversation-flashcard-back">
+                                <strong>{{ line.english }}</strong>
+                                <span class="conversation-ipa">{{ line.ipa }}</span>
+                                <small>Romanised as “{{ line.romanisation }}”</small>
+                              </span>
+                            </span>
+                          </button>
+                        </div>
+                    <span class="conversation-card-hint">Tap to see translation</span>
+                  </div>
+
+                  <nav class="vowel-pagination" aria-label="Conversation pagination">
+                    <button type="button" :disabled="currentConversationIndex === 0" aria-label="Previous conversation" title="Previous conversation" @click="showPreviousConversation">
+                      <span aria-hidden="true">◀</span>
+                    </button>
+                    <span>{{ currentConversationNumber }}/{{ currentConversationLessons.length }}</span>
+                    <button type="button" :aria-label="currentConversationIndex === currentConversationLessons.length - 1 ? 'Finish chapter' : 'Next conversation'" :title="currentConversationIndex === currentConversationLessons.length - 1 ? 'Finish chapter' : 'Next conversation'" @click="currentConversationIndex === currentConversationLessons.length - 1 ? finishConversationLesson() : showNextConversation()">
+                      <span aria-hidden="true">▶</span>
+                    </button>
+                  </nav>
+                </article>
+              </div>
             </template>
 
             <template v-else-if="studentLesson === 'vowels'">
@@ -2021,6 +2536,289 @@ button.profile-avatar-choice {
   width: 40px;
 }
 
+.spelling-module-home {
+  align-self: center;
+  display: grid;
+  gap: 22px;
+  width: 100%;
+}
+
+.spelling-module-header {
+  align-items: center;
+  background: linear-gradient(135deg, #e8f3f4 0%, #f8f2dc 100%);
+  border: 1px solid #c8d9d2;
+  border-radius: 28px;
+  display: flex;
+  justify-content: space-between;
+  padding: 34px 40px;
+}
+
+.spelling-module-header h1 {
+  color: #174b39;
+  font-size: clamp(32px, 4vw, 46px);
+  line-height: 1.08;
+  margin: 5px 0 8px;
+}
+
+.spelling-module-header p {
+  color: #52675e;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.spelling-module-count {
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid #c8d9d2;
+  border-radius: 999px;
+  color: #55715f;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  margin-left: 24px;
+  padding: 12px 18px;
+}
+
+.spelling-module-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.spelling-module-card {
+  align-items: center;
+  border: 1px solid;
+  border-radius: 26px;
+  color: #24473b;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 128px minmax(0, 1fr) 48px;
+  min-height: 230px;
+  padding: 30px;
+  text-align: left;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.spelling-module-card:hover {
+  box-shadow: 0 16px 32px rgba(36, 71, 59, .13);
+  transform: translateY(-4px);
+}
+
+.spelling-module-card--words {
+  background: #e8f3f4;
+  border-color: #c4dfe0;
+}
+
+.spelling-module-card--numbers {
+  background: #fbf2d9;
+  border-color: #ead8a8;
+}
+
+.spelling-module-symbol {
+  align-items: center;
+  background: rgba(255, 255, 255, .82);
+  border-radius: 24px;
+  display: flex;
+  font-size: 34px;
+  font-weight: 800;
+  height: 104px;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+  width: 128px;
+}
+
+.spelling-module-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.spelling-module-copy small {
+  color: #6c7f65;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.spelling-module-copy strong {
+  color: #174b39;
+  font-size: 28px;
+  margin: 5px 0 9px;
+}
+
+.spelling-module-copy > span {
+  color: #5f7069;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.spelling-module-arrow {
+  align-items: center;
+  background: rgba(255, 255, 255, .78);
+  border-radius: 50%;
+  display: flex;
+  font-size: 24px;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.conversation-chapter-home {
+  align-self: center;
+  display: grid;
+  gap: 22px;
+  width: 100%;
+}
+
+.conversation-chapter-header {
+  align-items: center;
+  background: linear-gradient(135deg, #faece3 0%, #f8f2dc 100%);
+  border: 1px solid #e2d3bd;
+  border-radius: 28px;
+  display: flex;
+  justify-content: space-between;
+  padding: 32px 40px;
+}
+
+.conversation-chapter-header h1 {
+  color: #174b39;
+  font-size: clamp(32px, 4vw, 46px);
+  line-height: 1.08;
+  margin: 5px 0 8px;
+}
+
+.conversation-chapter-header p {
+  color: #52675e;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.conversation-chapter-count {
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid #e2d3bd;
+  border-radius: 999px;
+  color: #55715f;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  margin-left: 24px;
+  padding: 12px 18px;
+}
+
+.conversation-chapter-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.conversation-chapter-card {
+  border: 1px solid;
+  border-radius: 24px;
+  color: #24473b;
+  display: grid;
+  gap: 17px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  min-height: 265px;
+  padding: 26px;
+  position: relative;
+  text-align: left;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.conversation-chapter-card:hover {
+  box-shadow: 0 15px 30px rgba(36, 71, 59, .13);
+  transform: translateY(-4px);
+}
+
+.conversation-chapter-card--mint {
+  background: #edf6e8;
+  border-color: #c8ddbf;
+}
+
+.conversation-chapter-card--sky {
+  background: #e8f3f4;
+  border-color: #c4dfe0;
+}
+
+.conversation-chapter-card--sun {
+  background: #fbf2d9;
+  border-color: #ead8a8;
+}
+
+.conversation-chapter-number {
+  align-items: center;
+  background: rgba(255, 255, 255, .82);
+  border-radius: 16px;
+  display: flex;
+  font-size: 18px;
+  font-weight: 800;
+  height: 58px;
+  justify-content: center;
+  width: 58px;
+}
+
+.conversation-chapter-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.conversation-chapter-copy small {
+  color: #6c7f65;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.conversation-chapter-copy strong {
+  color: #174b39;
+  font-size: 29px;
+  line-height: 1.15;
+  margin: 9px 0 3px;
+}
+
+.conversation-chapter-copy b {
+  color: #315c45;
+  font-size: 17px;
+}
+
+.conversation-chapter-copy > span {
+  color: #5f7069;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+.conversation-chapter-meta {
+  align-items: center;
+  bottom: 20px;
+  display: flex;
+  gap: 5px;
+  left: 101px;
+  position: absolute;
+  right: 24px;
+}
+
+.conversation-chapter-meta b {
+  color: #174b39;
+  font-size: 17px;
+}
+
+.conversation-chapter-meta small {
+  color: #6c7f65;
+  font-size: 12px;
+}
+
+.conversation-chapter-meta i {
+  font-size: 20px;
+  font-style: normal;
+  margin-left: auto;
+}
+
 .blending-group-page {
   align-self: start;
   display: grid;
@@ -2454,6 +3252,318 @@ button.profile-avatar-choice {
 .word-blend-tip h2 {
   font-size: 25px;
   margin-bottom: 4px;
+}
+
+.number-lesson-topline > span:last-child {
+  color: #71806c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.number-lesson-main {
+  align-items: center;
+  display: grid;
+  gap: 50px;
+  grid-template-columns: minmax(260px, .9fr) minmax(320px, 1.1fr);
+  min-height: 300px;
+  padding: 18px 70px 28px;
+}
+
+.number-bengali-digit {
+  color: #174b39;
+  font-size: clamp(180px, 20vw, 270px);
+  font-weight: 800;
+  line-height: .85;
+  text-align: center;
+}
+
+.number-lesson-copy {
+  border-left: 1px solid #cbd8c4;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px 0 24px 54px;
+}
+
+.number-lesson-copy > span:first-child {
+  color: #71806c;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.number-lesson-copy h1 {
+  color: #174b39;
+  font-size: clamp(54px, 6vw, 82px);
+  line-height: 1.05;
+  margin: 12px 0 22px;
+}
+
+.number-ipa-row strong {
+  color: #2c6248;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 42px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.number-lesson-copy > small {
+  color: #5f7069;
+  font-size: 14px;
+  margin-top: 9px;
+}
+
+.number-lesson-copy > p {
+  color: #315c45;
+  font-size: 21px;
+  font-weight: 800;
+  margin: 8px 0 0;
+}
+
+.number-match-tip {
+  margin-top: 0;
+}
+
+.number-match-tip .pronunciation-tip-icon {
+  flex-basis: 54px;
+  font-family: inherit;
+  font-size: 12px;
+  height: 54px;
+}
+
+.conversation-lesson-topline > span:last-child {
+  color: #71806c;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.story-reading-main {
+  margin: 0 auto;
+  max-width: 960px;
+  min-height: 410px;
+  padding: 28px 58px 38px;
+  width: 100%;
+}
+
+.story-reading-main > .student-eyebrow {
+  color: #71806c;
+}
+
+.story-reading-main > h1 {
+  color: #174b39;
+  font-size: clamp(34px, 4vw, 50px);
+  line-height: 1.2;
+  margin: 8px 0 26px;
+}
+
+.story-bangla-text {
+  display: grid;
+  gap: 18px;
+}
+
+.story-bangla-text p {
+  color: #174b39;
+  font-size: clamp(22px, 2.1vw, 30px);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.story-translation {
+  border-top: 1px solid #cbd8c4;
+  margin-top: 30px;
+  padding-top: 18px;
+}
+
+.story-translation summary {
+  color: #315c45;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.story-translation > div {
+  background: rgba(255, 255, 255, .76);
+  border: 1px solid #d4ddcf;
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 20px 24px;
+}
+
+.story-translation p {
+  color: #50685b;
+  font-size: 16px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.story-reading-main:focus-visible {
+  border-radius: 18px;
+  outline: 3px solid #174b39;
+  outline-offset: -3px;
+}
+
+.conversation-lesson-main {
+  min-height: 410px;
+  margin: 0 auto;
+  max-width: 940px;
+  padding: 30px 58px 62px;
+  position: relative;
+  width: 100%;
+}
+
+.conversation-message-avatar {
+  align-items: center;
+  background: #dcebd7;
+  border-radius: 50%;
+  color: #174b39;
+  display: flex;
+  flex: 0 0 auto;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.conversation-chat-area {
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.conversation-message-row {
+  align-items: flex-end;
+  display: flex;
+  gap: 10px;
+  max-width: 88%;
+}
+
+.conversation-message-row--sent {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.conversation-message-avatar {
+  background: #fff;
+  border: 1px solid #c9d8ce;
+  font-size: 12px;
+  height: 34px;
+  width: 34px;
+}
+
+.conversation-message-row--sent .conversation-message-avatar {
+  background: #d7ead2;
+}
+
+.conversation-flashcard {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  min-height: 150px;
+  min-width: min(560px, 70vw);
+  padding: 0;
+  perspective: 1200px;
+  text-align: left;
+}
+
+.conversation-flashcard-inner {
+  display: grid;
+  height: 100%;
+  min-height: 150px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform .45s cubic-bezier(.2, .75, .25, 1);
+}
+
+.conversation-flashcard.flipped .conversation-flashcard-inner {
+  transform: rotateY(180deg);
+}
+
+.conversation-flashcard-face {
+  backface-visibility: hidden;
+  border: 1px solid #d2ddd5;
+  border-radius: 8px 18px 18px 18px;
+  box-shadow: 0 5px 13px rgba(42, 76, 60, .1);
+  display: flex;
+  flex-direction: column;
+  grid-area: 1 / 1;
+  justify-content: center;
+  min-height: 150px;
+  padding: 18px 22px;
+  position: relative;
+  width: 100%;
+}
+
+.conversation-flashcard-front {
+  background: #fff;
+}
+
+.conversation-message-row--sent .conversation-flashcard-face {
+  border-radius: 18px 8px 18px 18px;
+}
+
+.conversation-message-row--sent .conversation-flashcard-front {
+  background: #dff1d8;
+}
+
+.conversation-flashcard-back {
+  background: #fff8df;
+  transform: rotateY(180deg);
+}
+
+.conversation-flashcard-front strong {
+  color: #174b39;
+  font-size: clamp(25px, 2.25vw, 34px);
+  line-height: 1.28;
+}
+
+.conversation-card-hint {
+  bottom: 20px;
+  color: #789084;
+  font-size: 12px;
+  position: absolute;
+  right: 58px;
+}
+
+.conversation-flashcard-back > strong {
+  color: #174b39;
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.conversation-ipa {
+  color: #315c45;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  margin-top: 8px;
+}
+
+.conversation-flashcard-back small {
+  color: #66776c;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.conversation-flashcard:focus-visible {
+  border-radius: 18px;
+  outline: 3px solid #174b39;
+  outline-offset: 4px;
+}
+
+.conversation-tip {
+  margin-top: 0;
+}
+
+.conversation-tip .pronunciation-tip-icon {
+  flex-basis: 52px;
+  font-family: inherit;
+  font-size: 12px;
+  height: 52px;
 }
 
 .single-vowel-letter-wrap {
@@ -3492,6 +4602,49 @@ button.profile-avatar-choice {
     width: 40px;
   }
 
+  .spelling-module-header {
+    padding: 26px 28px;
+  }
+
+  .spelling-module-grid {
+    gap: 16px;
+  }
+
+  .spelling-module-card {
+    align-content: start;
+    gap: 14px;
+    grid-template-columns: 96px minmax(0, 1fr);
+    min-height: 220px;
+    padding: 22px;
+  }
+
+  .spelling-module-symbol {
+    border-radius: 19px;
+    font-size: 27px;
+    height: 82px;
+    width: 96px;
+  }
+
+  .spelling-module-copy strong {
+    font-size: 23px;
+  }
+
+  .spelling-module-arrow {
+    display: none;
+  }
+
+  .conversation-chapter-header {
+    padding: 26px 28px;
+  }
+
+  .conversation-chapter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-chapter-card {
+    min-height: 165px;
+  }
+
   .student-lesson-content .vowel-lesson-stage {
     --lesson-side-space: 58px;
   }
@@ -3536,6 +4689,48 @@ button.profile-avatar-choice {
 
   .word-ipa-row > strong {
     font-size: 32px;
+  }
+
+  .number-lesson-main {
+    gap: 28px;
+    grid-template-columns: minmax(190px, .85fr) minmax(250px, 1.15fr);
+    min-height: 250px;
+    padding: 14px 30px 22px;
+  }
+
+  .number-bengali-digit {
+    font-size: clamp(150px, 24vw, 205px);
+  }
+
+  .number-lesson-copy {
+    padding: 18px 0 18px 32px;
+  }
+
+  .number-lesson-copy h1 {
+    font-size: clamp(46px, 7vw, 64px);
+  }
+
+  .conversation-lesson-main {
+    min-height: 390px;
+    padding: 14px 20px 52px;
+  }
+
+  .story-reading-main {
+    min-height: 390px;
+    padding: 18px 28px 30px;
+  }
+
+  .conversation-card-hint {
+    bottom: 16px;
+    right: 20px;
+  }
+
+  .conversation-flashcard {
+    min-width: min(500px, 66vw);
+  }
+
+  .conversation-flashcard-front strong {
+    font-size: clamp(23px, 3.2vw, 30px);
   }
 
   .single-vowel-transcription {
@@ -3723,6 +4918,108 @@ button.profile-avatar-choice {
     grid-template-columns: 1fr;
   }
 
+  .spelling-module-home {
+    align-self: start;
+    gap: 16px;
+    padding-top: 24px;
+  }
+
+  .spelling-module-header {
+    align-items: flex-start;
+    border-radius: 22px;
+    flex-direction: column;
+    gap: 15px;
+    padding: 24px;
+  }
+
+  .spelling-module-header h1 {
+    font-size: 30px;
+  }
+
+  .spelling-module-header p {
+    font-size: 14px;
+  }
+
+  .spelling-module-count {
+    margin-left: 0;
+  }
+
+  .spelling-module-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spelling-module-card {
+    gap: 16px;
+    grid-template-columns: 92px minmax(0, 1fr);
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .spelling-module-symbol {
+    border-radius: 18px;
+    font-size: 25px;
+    height: 76px;
+    width: 92px;
+  }
+
+  .spelling-module-copy strong {
+    font-size: 22px;
+    margin-bottom: 5px;
+  }
+
+  .spelling-module-copy > span {
+    font-size: 13px;
+  }
+
+  .spelling-module-arrow {
+    display: none;
+  }
+
+  .conversation-chapter-home {
+    align-self: start;
+    gap: 16px;
+    padding-top: 24px;
+  }
+
+  .conversation-chapter-header {
+    align-items: flex-start;
+    border-radius: 22px;
+    flex-direction: column;
+    gap: 15px;
+    padding: 24px;
+  }
+
+  .conversation-chapter-header h1 {
+    font-size: 30px;
+  }
+
+  .conversation-chapter-header p {
+    font-size: 14px;
+  }
+
+  .conversation-chapter-count {
+    margin-left: 0;
+  }
+
+  .conversation-chapter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-chapter-card {
+    min-height: 230px;
+    padding: 20px;
+  }
+
+  .conversation-chapter-copy strong {
+    font-size: 25px;
+  }
+
+  .conversation-chapter-meta {
+    bottom: 17px;
+    left: 95px;
+    right: 20px;
+  }
+
   .blending-group-page {
     margin-top: 24px;
   }
@@ -3832,6 +5129,133 @@ button.profile-avatar-choice {
   }
 
   .word-blend-tip {
+    padding: 18px;
+  }
+
+  .number-lesson-topline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .number-lesson-main {
+    gap: 16px;
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 24px 0 18px;
+  }
+
+  .number-bengali-digit {
+    font-size: clamp(150px, 48vw, 210px);
+  }
+
+  .number-lesson-copy {
+    align-items: center;
+    border-left: 0;
+    border-top: 1px solid #cbd8c4;
+    padding: 22px 0 0;
+    text-align: center;
+  }
+
+  .number-lesson-copy h1 {
+    font-size: clamp(46px, 15vw, 68px);
+    margin-bottom: 16px;
+  }
+
+  .number-ipa-row strong {
+    font-size: 36px;
+  }
+
+  .number-match-tip {
+    padding: 18px;
+  }
+
+  .conversation-lesson-topline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .conversation-lesson-main {
+    min-height: 0;
+    padding: 20px 0 18px;
+  }
+
+  .story-reading-main {
+    min-height: 0;
+    padding: 24px 4px 20px;
+  }
+
+  .story-reading-main > h1 {
+    font-size: clamp(30px, 9vw, 40px);
+    margin-bottom: 20px;
+  }
+
+  .story-bangla-text {
+    gap: 15px;
+  }
+
+  .story-bangla-text p {
+    font-size: clamp(20px, 6vw, 26px);
+  }
+
+  .story-translation > div {
+    padding: 16px;
+  }
+
+  .conversation-chat-area {
+    gap: 12px;
+    min-height: 300px;
+    padding: 16px 12px 48px;
+  }
+
+  .conversation-card-hint {
+    bottom: 12px;
+    right: 14px;
+  }
+
+  .conversation-message-row {
+    gap: 7px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .conversation-message-avatar {
+    height: 30px;
+    width: 30px;
+  }
+
+  .conversation-flashcard {
+    flex: 1;
+    min-height: 150px;
+    min-width: 0;
+    width: calc(100% - 37px);
+  }
+
+  .conversation-flashcard-inner,
+  .conversation-flashcard-face {
+    min-height: 150px;
+  }
+
+  .conversation-flashcard-face {
+    padding: 15px;
+  }
+
+  .conversation-flashcard-front strong {
+    font-size: clamp(22px, 6.5vw, 28px);
+    overflow-wrap: anywhere;
+  }
+
+  .conversation-flashcard-back > strong {
+    font-size: 17px;
+  }
+
+  .conversation-ipa {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+
+  .conversation-tip {
     padding: 18px;
   }
 
