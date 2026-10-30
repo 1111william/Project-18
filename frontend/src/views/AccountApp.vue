@@ -403,9 +403,9 @@ const consonants = [
   { letter: 'ষ', ipa: '[ʃɔ]', romanisation: 'ṣa', tipTitle: 'Use the lesson’s “sh” sound', tip: 'In modern Bangla it is usually pronounced like শ. The spelling shows which letter is used.' },
   { letter: 'স', ipa: '[sɔ]', romanisation: 'sa', tipTitle: 'Use a light “s” sound', tip: 'It is close to the “s” in “see”, though its value may shift toward “sh” in some words.' },
   { letter: 'হ', ipa: '[hɔ]', romanisation: 'ha', tipTitle: 'Let the breath flow freely', tip: 'It is close to the “h” in “home”. Keep the throat open and use a gentle stream of air.' },
-  { letter: 'ড়', ipa: '[ɽɔ]', romanisation: 'ṛa', tipTitle: 'Use a quick curled tongue flap', tip: 'Curl the tongue tip back and flick it forward once while keeping the sound voiced.' },
-  { letter: 'ঢ়', ipa: '[ɽʱɔ]', romanisation: 'ṛha', tipTitle: 'Add breath to the curled flap', tip: 'Begin like ড়, then add a soft breath immediately after the quick tongue movement.' },
-  { letter: 'য়', ipa: '[jɔ]', romanisation: 'ya', tipTitle: 'Use a short “y” glide', tip: 'It is close to the “y” in “yes”. Move smoothly into the vowel that follows.' },
+  { letter: 'ড়', ipa: '[ɽɔ]', romanisation: 'ṛa', tipTitle: 'Use a quick curled tongue flap', tip: 'Curl the tongue tip back and flick it forward once while keeping the sound voiced.' },
+  { letter: 'ঢ়', ipa: '[ɽʱɔ]', romanisation: 'ṛha', tipTitle: 'Add breath to the curled flap', tip: 'Begin like ড়, then add a soft breath immediately after the quick tongue movement.' },
+  { letter: 'য়', ipa: '[jɔ]', romanisation: 'ya', tipTitle: 'Use a short “y” glide', tip: 'It is close to the “y” in “yes”. Move smoothly into the vowel that follows.' },
   { letter: 'ৎ', ipa: '[t̪]', romanisation: 't', tipTitle: 'Use the shortened “t” sign', tip: 'This special consonant form gives a brief dental “t” sound and normally appears within a word.' },
   { letter: 'ং', displayLetter: 'অং', category: 'special', ipa: '[ɔŋ]', romanisation: 'aṃ', tipTitle: 'Add a nasal “ng” sound', tip: 'The sign ং is shown with অ so that it renders in context. In অং, it contributes the velar nasal [ŋ].' },
   { letter: 'ঃ', displayLetter: 'অঃ', category: 'special', ipa: '[ɔh]', romanisation: 'aḥ', tipTitle: 'Release a light final breath', tip: 'The sign ঃ is shown with অ because it normally follows another sound. In অঃ, it contributes a light [h]-like release.' },
@@ -796,8 +796,40 @@ function selectConsonantVowel(index) {
   currentConsonantVowelIndex.value = index
   consonantFeedback.value = ''
 }
+// Load the Bengali letter MP3 files already stored under src/assets/audio/.
+// Examples: 01_অ.mp3, 12_ক.mp3, 13_খ.mp3
+const letterAudioFiles = import.meta.glob('../assets/audio/*.mp3', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
+let activeLetterAudio = null
+
+async function playLetterAudio(letter, feedback) {
+  const match = Object.entries(letterAudioFiles).find(([path]) => {
+    const filename = path.split('/').pop()
+    const filenameLetter = filename.replace(/^[^_]*_/, '').replace(/\.mp3$/i, '')
+    return filenameLetter.normalize('NFC') === letter.normalize('NFC')
+  })
+
+  if (!match) {
+    feedback.value = `No MP3 file found for ${letter}. Check src/assets/audio/.`
+    return
+  }
+
+  try {
+    if (activeLetterAudio) activeLetterAudio.pause()
+    activeLetterAudio = new Audio(match[1])
+    await activeLetterAudio.play()
+    feedback.value = ''
+  } catch (error) {
+    feedback.value = `Could not play the pronunciation for ${letter}.`
+    console.error(error)
+  }
+}
+
 function previewVowelSound() {
-  vowelFeedback.value = `Pronunciation audio for ${currentVowel.value.letter} will be added here later.`
+  playLetterAudio(currentVowel.value.letter, vowelFeedback)
 }
 function showPreviousVowel() {
   if (currentVowelIndex.value === 0) return
@@ -825,7 +857,11 @@ function finishVowelLesson() {
   nextTick(() => heading.value?.focus())
 }
 function previewConsonantSound() {
-  consonantFeedback.value = `Pronunciation audio for ${currentConsonantCombination.value} will be added here later.`
+  if (currentConsonantCanBlend.value && currentConsonantVowelIndex.value !== 0) {
+    consonantFeedback.value = 'Only the standalone consonant audio is available; combined vowel sounds need separate MP3 files.'
+    return
+  }
+  playLetterAudio(currentConsonant.value.letter, consonantFeedback)
 }
 function showPreviousConsonant() {
   if (currentConsonantIndex.value === 0) return
@@ -1757,7 +1793,7 @@ function signOut() {
                     <span>Pronunciation</span>
                     <div class="vowel-ipa-row">
                       <strong>{{ currentVowel.ipa }}</strong>
-                      <button class="vowel-speaker-button" type="button" :aria-label="`Play pronunciation for ${currentVowel.letter}`" title="Pronunciation audio will be added later" @click="previewVowelSound">
+                      <button class="vowel-speaker-button" type="button" :aria-label="`Play pronunciation for ${currentVowel.letter}`" title="Play pronunciation" @click="previewVowelSound">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5-.5a5 5 0 0 1 0 7m2.5-9.5a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       </button>
                     </div>
@@ -1823,7 +1859,7 @@ function signOut() {
                     <span>Pronunciation</span>
                     <div class="vowel-ipa-row">
                       <strong>{{ currentConsonantCombinationIpa }}</strong>
-                      <button class="vowel-speaker-button" type="button" :aria-label="`Play pronunciation for ${currentConsonantCombination}`" title="Pronunciation audio will be added later" @click="previewConsonantSound">
+                      <button class="vowel-speaker-button" type="button" :aria-label="`Play pronunciation for ${currentConsonantCombination}`" title="Play pronunciation" @click="previewConsonantSound">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5-.5a5 5 0 0 1 0 7m2.5-9.5a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       </button>
                     </div>
