@@ -431,6 +431,8 @@ def seed_demo_data(db: Session, *, password_hash: str) -> None:
         [
             Quiz(quizID=1, lessonID=1, title="Vowel letters check"),
             Quiz(quizID=2, lessonID=4, title="Festivals check"),
+            Quiz(quizID=3, lessonID=3, title="Vowel signs check"),
+            Quiz(quizID=4, lessonID=5, title="Rivers and land check"),
         ]
     )
     db.flush()
@@ -456,7 +458,28 @@ def seed_demo_data(db: Session, *, password_hash: str) -> None:
                 quizID=2,
                 questionOrder=1,
                 questionKind="single",
-                prompt="Which festival question placeholder?",
+                prompt="What is the Bengali New Year celebration called?",
+            ),
+            QuizQuestion(
+                questionID=4,
+                quizID=3,
+                questionOrder=1,
+                questionKind="single",
+                prompt="What does a Bangla vowel sign do?",
+            ),
+            QuizQuestion(
+                questionID=5,
+                quizID=4,
+                questionOrder=1,
+                questionKind="single",
+                prompt="Which natural features shape much of Bangladesh?",
+            ),
+            QuizQuestion(
+                questionID=6,
+                quizID=3,
+                questionOrder=2,
+                questionKind="multiple",
+                prompt="Which two symbols are Bangla vowel signs?",
             ),
         ]
     )
@@ -482,15 +505,42 @@ def seed_demo_data(db: Session, *, password_hash: str) -> None:
             QuizOption(
                 questionID=3,
                 optionOrder=1,
-                optionText="First option",
+                optionText="Pohela Boishakh",
                 isCorrect=True,
             ),
             QuizOption(
                 questionID=3,
                 optionOrder=2,
-                optionText="Second option",
+                optionText="Victory Day",
                 isCorrect=False,
             ),
+            QuizOption(
+                questionID=4,
+                optionOrder=1,
+                optionText="It changes the vowel sound of a consonant",
+                isCorrect=True,
+            ),
+            QuizOption(
+                questionID=4,
+                optionOrder=2,
+                optionText="It removes the consonant from a word",
+                isCorrect=False,
+            ),
+            QuizOption(
+                questionID=5,
+                optionOrder=1,
+                optionText="Rivers",
+                isCorrect=True,
+            ),
+            QuizOption(
+                questionID=5,
+                optionOrder=2,
+                optionText="Deserts",
+                isCorrect=False,
+            ),
+            QuizOption(questionID=6, optionOrder=1, optionText="া", isCorrect=True),
+            QuizOption(questionID=6, optionOrder=2, optionText="ি", isCorrect=True),
+            QuizOption(questionID=6, optionOrder=3, optionText="ক", isCorrect=False),
         ]
     )
     db.add_all(

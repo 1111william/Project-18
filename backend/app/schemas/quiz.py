@@ -1,46 +1,19 @@
-from typing import List
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class QuizOptionResponse(BaseModel):
-    id: int
-    text: str
-
-
-class QuizQuestionResponse(BaseModel):
-    id: int
-    question_type: str
-    question_text: str
-    options: List[QuizOptionResponse] = []
-
-
-class QuizResponse(BaseModel):
-    id: int
-    title: str
-    level_id: int
-    questions: List[QuizQuestionResponse]
+PositiveID = Annotated[int, Field(strict=True, gt=0)]
 
 
 class AnswerItem(BaseModel):
-    question_id: int
-    selected_option_ids: List[int]
+    model_config = ConfigDict(extra="forbid")
+
+    questionID: PositiveID
+    selectedOptionIDs: list[PositiveID] = Field(min_length=1)
 
 
 class QuizSubmissionRequest(BaseModel):
-    child_id: int
-    answers: List[AnswerItem]
+    model_config = ConfigDict(extra="forbid")
 
-
-class AnswerResult(BaseModel):
-    question_id: int
-    correct: bool
-    correct_option_ids: List[int]
-
-
-class QuizSubmissionResponse(BaseModel):
-    quiz_id: int
-    child_id: int
-    score: int
-    total_questions: int
-    percentage: float
-    answers: List[AnswerResult]
+    answers: list[AnswerItem] = Field(default_factory=list)
