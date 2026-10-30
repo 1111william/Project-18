@@ -4,7 +4,7 @@ FastAPI, SQLAlchemy, and MySQL backend for the Bangla learning platform. Run all
 
 ## Current scope
 
-The child-profile foundation, account/password session flow, parent PIN workflow, and shared API envelope are the stable integration surface. Complete Quiz persistence and business rules are still team work in progress.
+The child-profile foundation, account/password session flow, parent PIN workflow, shared API envelope, and database-backed Quiz workflow are the stable integration surface. Quiz routes follow `docs/module-api-contract.md`, use child ownership checks, calculate scores on the server, and retain every valid attempt.
 
 See [docs/api-contract.md](docs/api-contract.md) before adding frontend calls and [docs/deployment.md](docs/deployment.md) before configuring Railway or AWS.
 
@@ -63,6 +63,15 @@ The reset drops only the eleven managed tables plus `alembic_version`, upgrades 
 Stop services with `docker compose down`. Add `--volumes` only when you intentionally want to erase the local MySQL volume.
 
 ## Tests
+
+Install the development requirements and run the Quiz contract tests from the repository root:
+
+```powershell
+& .venv/Scripts/python -m pip install -r backend/requirements-dev.txt
+& .venv/Scripts/python -m pytest backend/tests/test_quizzes.py -q
+```
+
+On macOS/Linux, use `.venv/bin/python` instead. These tests use an in-memory SQLite database and signed test sessions; the existing MySQL integration suite remains the source of truth for database-specific locking behaviour.
 
 The default test command runs offline/unit contract tests and skips the opt-in real-MySQL HTTP suite:
 
@@ -132,7 +141,7 @@ Proxy headers remain disabled unless explicitly enabled. Prefer concrete proxy I
 
 ## Integration rules
 
-- Use `ok()` and `ApiError`; completed foundation endpoints use the shared envelope, and new modules must do the same. Quiz remains explicitly unfinished.
+- Use `ok()` and `ApiError`; completed foundation and Quiz endpoints use the shared envelope, and new modules must do the same.
 - Keep existing child-profile JSON names in camelCase (`childID`, `parentID`, `ageBand`, `currentLevelID`).
 - Child-owned endpoints must use `Depends(owned_child)` with a path parameter named `childID`.
 - Cookie-authenticated writes are protected by Origin/Referer validation; do not bypass it for new routes.

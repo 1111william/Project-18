@@ -177,6 +177,11 @@ app.include_router(
     tags=["Quiz"],
 )
 app.include_router(
+    quizzes.child_router,
+    prefix="/api/children",
+    tags=["Quiz"],
+)
+app.include_router(
     children.router,
     prefix="/api/children",
     tags=["Children"],

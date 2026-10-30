@@ -11,7 +11,7 @@ This repository contains a Vue frontend scaffold and a FastAPI/MySQL backend fou
 
 ## Implementation status
 
-Child-profile CRUD, account registration and password login, password recovery, parent PIN verification, and the shared response/error conventions are the current backend integration base. Complete Quiz behavior remains assigned work.
+Child-profile CRUD, account registration and password login, password recovery, parent PIN verification, student learning pages, and the shared response/error conventions are the current integration base. The Quiz module now supports lesson-based discovery, safe question loading, server-side scoring, saved attempts, feedback, and result history.
 
 ## Start here
 

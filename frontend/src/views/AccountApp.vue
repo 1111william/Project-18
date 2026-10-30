@@ -24,6 +24,9 @@ const fieldErrors = ref({})
 const busy = ref(false), booting = ref(true), challenge = ref(null), signedIn = ref(null)
 const children = ref([]), childrenLoading = ref(false)
 const studentHome = ref(null)
+const quizCatalog = ref([])
+const quizData = ref(null), quizLesson = ref(null), quizAnswers = ref({})
+const quizResult = ref(null), quizHistory = ref([])
 const learningPreview = ref('')
 const studentLesson = ref('home')
 const currentWordIndex = ref(0)
@@ -427,6 +430,9 @@ const currentConsonantCombination = computed(() => currentConsonantCanBlend.valu
 const currentConsonantCombinationIpa = computed(() => currentConsonantCanBlend.value ? `[${currentConsonantBaseIpa.value}${currentConsonantVowel.value.ipa}]` : currentConsonant.value.ipa)
 const currentConsonantCombinationRomanisation = computed(() => currentConsonantCanBlend.value ? `${currentConsonantBaseRomanisation.value}${currentConsonantVowel.value.romanisation}` : currentConsonant.value.romanisation)
 const currentConsonantSpokenIpa = computed(() => currentConsonantCombinationIpa.value.replace(/^\[/, '').replace(/\]$/, ''))
+const answeredQuizCount = computed(() => quizData.value?.questions.filter(question =>
+  (quizAnswers.value[question.questionID] || []).length > 0).length || 0)
+const quizReady = computed(() => !!quizData.value?.questions.length && answeredQuizCount.value === quizData.value.questions.length)
 const titles = { login: 'Welcome back.', register: 'Start something wonderful.', forgot: 'Reset your password.', verify: 'Check your inbox.', reset: 'Set a new password.' }
 const subtitles = { login: 'A little learning. A world of possibility.', register: 'Create your account and begin your journey.', forgot: 'Enter your email and we will send you a verification code.', verify: 'Enter the six-digit code to continue.', reset: 'Choose a secure password for your account.' }
 const isChildCreate = computed(() => !!signedIn.value && page.value === 'child-create')
@@ -534,16 +540,27 @@ function cancelChildCreate() {
 }
 function openStudentHome(child) {
   cancelDeleteConfirm()
+  resetQuiz()
+  quizCatalog.value = []
   learningPreview.value = ''
   studentLesson.value = 'home'
   run(async () => {
-    studentHome.value = await accountApi(`/children/${child.childID}/home`)
+    const home = await accountApi(`/children/${child.childID}/home`)
+    const quizGroups = await Promise.all((home.lessons || []).map(async lesson => {
+      const quizzes = await accountApi(`/quizzes?lessonID=${lesson.lessonID}`)
+      return quizzes.map(quiz => ({ lesson, quiz }))
+    }))
+    studentHome.value = home
+    quizCatalog.value = quizGroups.flat()
     go('student-home')
   })
 }
 function closeStudentHome() {
   if (studentLesson.value !== 'home') {
-    if (studentLesson.value === 'blending-home' || studentLesson.value === 'numbers') {
+    if (studentLesson.value === 'quiz') {
+      studentLesson.value = 'home'
+      resetQuiz()
+    } else if (studentLesson.value === 'blending-home' || studentLesson.value === 'numbers') {
       studentLesson.value = 'spelling-home'
     } else if (studentLesson.value === 'conversations') {
       studentLesson.value = 'conversation-home'
@@ -559,6 +576,8 @@ function closeStudentHome() {
     return
   }
   studentHome.value = null
+  quizCatalog.value = []
+  resetQuiz()
   learningPreview.value = ''
   go('login')
 }
@@ -599,6 +618,78 @@ function previewLearningArea(area) {
     return
   }
   learningPreview.value = `${area.title} activities will be connected in the next learning step.`
+}
+function resetQuiz() {
+  quizData.value = null
+  quizLesson.value = null
+  quizAnswers.value = {}
+  quizResult.value = null
+  quizHistory.value = []
+}
+function openQuiz(lesson, quiz) {
+  run(async () => {
+    const childID = studentHome.value.child.childID
+    const [loadedQuiz, history] = await Promise.all([
+      accountApi(`/quizzes/${quiz.quizID}`),
+      accountApi(`/children/${childID}/quiz-results?quizID=${quiz.quizID}`),
+    ])
+    if (loadedQuiz.lessonID !== lesson.lessonID) {
+      throw new Error('This quiz is no longer linked to the selected lesson.')
+    }
+    quizLesson.value = lesson
+    quizData.value = loadedQuiz
+    quizHistory.value = history
+    quizAnswers.value = Object.fromEntries(loadedQuiz.questions.map(question => [question.questionID, []]))
+    quizResult.value = null
+    studentLesson.value = 'quiz'
+    nextTick(() => heading.value?.focus())
+  })
+}
+function isQuizOptionSelected(questionID, optionID) {
+  return (quizAnswers.value[questionID] || []).includes(optionID)
+}
+function toggleQuizOption(question, optionID) {
+  const selected = quizAnswers.value[question.questionID] || []
+  quizAnswers.value = {
+    ...quizAnswers.value,
+    [question.questionID]: question.questionKind === 'multiple'
+      ? (selected.includes(optionID) ? selected.filter(id => id !== optionID) : [...selected, optionID])
+      : [optionID],
+  }
+}
+function submitQuiz() {
+  if (!quizReady.value) {
+    error.value = 'Answer every question before submitting.'
+    return
+  }
+  run(async () => {
+    const childID = studentHome.value.child.childID
+    const quizID = quizData.value.quizID
+    quizResult.value = await accountApi(`/children/${childID}/quizzes/${quizID}/attempts`, {
+      method: 'POST',
+      body: {
+        answers: quizData.value.questions.map(question => ({
+          questionID: question.questionID,
+          selectedOptionIDs: quizAnswers.value[question.questionID],
+        })),
+      },
+    })
+    quizHistory.value = await accountApi(`/children/${childID}/quiz-results?quizID=${quizID}`)
+    nextTick(() => heading.value?.focus())
+  })
+}
+function retryQuiz() {
+  quizAnswers.value = Object.fromEntries(quizData.value.questions.map(question => [question.questionID, []]))
+  quizResult.value = null
+  error.value = ''
+  nextTick(() => heading.value?.focus())
+}
+function quizFeedback(questionID) {
+  return quizResult.value?.feedback.find(answer => answer.questionID === questionID)
+}
+function quizOptionText(question, optionIDs) {
+  const ids = new Set(optionIDs || [])
+  return question.options.filter(option => ids.has(option.optionID)).map(option => option.optionText).join(', ')
 }
 function openConversationChapter(index) {
   currentConversationChapterIndex.value = index
@@ -1088,6 +1179,8 @@ function signOut() {
     await accountApi('/auth/logout', { method: 'POST', body: {} })
     cancelPinEditor()
     parentAccessPin.value = ''
+    resetQuiz()
+    quizCatalog.value = []
     signedIn.value = null; children.value = []; studentHome.value = null; email.value = ''; password.value = ''; go('login')
   })
 }
@@ -1235,7 +1328,118 @@ function signOut() {
                     <span class="learning-area-arrow" aria-hidden="true">→</span>
                   </button>
                 </div>
+
+                <section v-if="quizCatalog.length" class="quiz-launcher" aria-labelledby="quiz-launcher-title">
+                  <div class="learning-area-heading">
+                    <div>
+                      <span class="student-eyebrow">Knowledge checks</span>
+                      <h2 id="quiz-launcher-title">Ready for a quiz?</h2>
+                    </div>
+                    <span>{{ quizCatalog.length }} available</span>
+                  </div>
+                  <div class="quiz-launcher-grid">
+                    <article v-for="entry in quizCatalog" :key="entry.quiz.quizID" class="quiz-launcher-card">
+                      <div>
+                        <small>{{ entry.lesson.title }}</small>
+                        <strong>{{ entry.quiz.title }}</strong>
+                        <span>{{ entry.quiz.questionCount }} questions · Pass mark {{ entry.quiz.passMark }}%</span>
+                      </div>
+                      <button type="button" :disabled="busy || entry.quiz.questionCount === 0" @click="openQuiz(entry.lesson, entry.quiz)">
+                        {{ entry.quiz.questionCount ? 'Start quiz' : 'Coming soon' }} <span v-if="entry.quiz.questionCount" aria-hidden="true">→</span>
+                      </button>
+                    </article>
+                  </div>
+                </section>
               </div>
+            </template>
+
+            <template v-else-if="studentLesson === 'quiz' && quizData">
+              <section class="quiz-page">
+                <header class="quiz-header">
+                  <div>
+                    <span class="student-eyebrow">{{ quizLesson.title }} · Knowledge check</span>
+                    <h1 id="page-title" ref="heading" tabindex="-1">{{ quizData.title }}</h1>
+                    <p v-if="!quizResult">Complete every question, then submit your answers.</p>
+                    <p v-else>Attempt {{ quizResult.attemptNumber }} · {{ quizResult.correctCount }} of {{ quizResult.totalCount }} correct</p>
+                  </div>
+                  <div class="quiz-progress-pill">
+                    <span>{{ quizResult ? 'Score' : 'Answered' }}</span>
+                    <strong>{{ quizResult ? `${quizResult.score}%` : `${answeredQuizCount} / ${quizData.questions.length}` }}</strong>
+                  </div>
+                </header>
+
+                <form v-if="!quizResult" class="quiz-form" @submit.prevent="submitQuiz">
+                  <fieldset :disabled="busy">
+                    <section v-for="(question, index) in quizData.questions" :key="question.questionID" class="quiz-question">
+                      <div class="quiz-question-title">
+                        <span>{{ String(index + 1).padStart(2, '0') }}</span>
+                        <div>
+                          <h2>{{ question.prompt }}</h2>
+                          <small v-if="question.questionKind === 'multiple'">Select all correct answers.</small>
+                        </div>
+                      </div>
+                      <div class="quiz-options">
+                        <label
+                          v-for="option in question.options"
+                          :key="option.optionID"
+                          :class="{ selected: isQuizOptionSelected(question.questionID, option.optionID) }"
+                        >
+                          <input
+                            :type="question.questionKind === 'multiple' ? 'checkbox' : 'radio'"
+                            :name="`question-${question.questionID}`"
+                            :checked="isQuizOptionSelected(question.questionID, option.optionID)"
+                            @change="toggleQuizOption(question, option.optionID)"
+                          >
+                          <span lang="bn">{{ option.optionText }}</span>
+                        </label>
+                      </div>
+                    </section>
+                    <div class="quiz-submit-row">
+                      <span>{{ quizReady ? 'All questions answered.' : `${quizData.questions.length - answeredQuizCount} question${quizData.questions.length - answeredQuizCount === 1 ? '' : 's'} remaining.` }}</span>
+                      <button class="primary" type="submit" :disabled="!quizReady || busy">{{ busy ? 'Submitting…' : 'Submit quiz' }}</button>
+                    </div>
+                  </fieldset>
+                </form>
+
+                <section v-else class="quiz-results" aria-live="polite">
+                  <div class="quiz-result-banner" :class="{ passed: quizResult.passed }">
+                    <span aria-hidden="true">{{ quizResult.passed ? '✓' : '↻' }}</span>
+                    <div>
+                      <strong>{{ quizResult.passed ? 'Quiz passed!' : 'Keep practising' }}</strong>
+                      <p>You scored {{ quizResult.score }}%. The pass mark is {{ quizData.passMark }}%.</p>
+                    </div>
+                  </div>
+                  <div class="quiz-feedback-list">
+                    <article v-for="(question, index) in quizData.questions" :key="question.questionID" class="quiz-feedback" :class="{ correct: quizFeedback(question.questionID)?.correct }">
+                      <span class="quiz-feedback-number">{{ index + 1 }}</span>
+                      <div>
+                        <h2>{{ question.prompt }}</h2>
+                        <p>Your answer: <strong lang="bn">{{ quizOptionText(question, quizAnswers[question.questionID]) }}</strong></p>
+                        <p v-if="!quizFeedback(question.questionID)?.correct">Correct answer: <strong lang="bn">{{ quizOptionText(question, quizFeedback(question.questionID)?.correctOptionIDs) }}</strong></p>
+                      </div>
+                      <strong>{{ quizFeedback(question.questionID)?.correct ? 'Correct' : 'Review' }}</strong>
+                    </article>
+                  </div>
+                  <div class="quiz-result-actions">
+                    <button class="secondary" type="button" @click="closeStudentHome">Back to learning home</button>
+                    <button class="primary" type="button" @click="retryQuiz">Try again</button>
+                  </div>
+                </section>
+
+                <aside v-if="quizHistory.length" class="quiz-history" aria-labelledby="quiz-history-title">
+                  <div>
+                    <span class="student-eyebrow">Progress</span>
+                    <h2 id="quiz-history-title">Previous attempts</h2>
+                  </div>
+                  <ol>
+                    <li v-for="attempt in quizHistory" :key="attempt.resultID">
+                      <span>Attempt {{ attempt.attemptNumber }}</span>
+                      <strong>{{ attempt.score }}%</strong>
+                      <small>{{ attempt.passed ? 'Passed' : 'Keep practising' }}</small>
+                    </li>
+                  </ol>
+                </aside>
+              </section>
             </template>
 
             <template v-else-if="studentLesson === 'spelling-home'">
@@ -2221,6 +2425,7 @@ button.profile-avatar-choice {
 .account-page.student-page {
   align-items: flex-start;
   overflow-x: clip;
+  overflow-y: visible;
   padding-left: 0;
   padding-right: 0;
   padding-top: 28px;
@@ -2534,6 +2739,303 @@ button.profile-avatar-choice {
   justify-content: center;
   justify-self: end;
   width: 40px;
+}
+
+.quiz-launcher {
+  display: grid;
+  gap: 16px;
+  padding-top: 6px;
+}
+
+.quiz-launcher-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quiz-launcher-card {
+  align-items: center;
+  background: #f4f0fa;
+  border: 1px solid #d8cae8;
+  border-radius: 20px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 20px 22px;
+}
+
+.quiz-launcher-card > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.quiz-launcher-card small,
+.quiz-launcher-card span {
+  color: #6c6178;
+  font-size: 12px;
+}
+
+.quiz-launcher-card strong {
+  color: #3f2857;
+  font-size: 18px;
+  margin: 3px 0 5px;
+}
+
+.quiz-launcher-card button {
+  background: #60417b;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  flex: 0 0 auto;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 11px 14px;
+}
+
+.quiz-launcher-card button:disabled {
+  background: #9485a0;
+}
+
+.quiz-page {
+  display: grid;
+  gap: 22px;
+  margin: calc(var(--signed-content-top-gap) - 24px) auto 0;
+  max-width: 980px;
+  padding: 0 24px 80px;
+  width: 100%;
+}
+
+.quiz-header {
+  align-items: center;
+  background: linear-gradient(135deg, #edf5e7, #f4f0fa);
+  border: 1px solid #cbd9be;
+  border-radius: 24px;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 26px 30px;
+}
+
+.quiz-header h1 {
+  color: #174b39;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.08;
+  margin: 4px 0 7px;
+}
+
+.quiz-header p {
+  color: #52675e;
+  margin: 0;
+}
+
+.quiz-progress-pill {
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid #c7d5c0;
+  border-radius: 18px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 130px;
+  padding: 14px 18px;
+  text-align: center;
+}
+
+.quiz-progress-pill span {
+  color: #6c7f65;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.quiz-progress-pill strong {
+  color: #174b39;
+  font-size: 24px;
+}
+
+.quiz-form fieldset,
+.quiz-results {
+  display: grid;
+  gap: 18px;
+}
+
+.quiz-question,
+.quiz-feedback,
+.quiz-history {
+  background: #fff;
+  border: 1px solid #d7dfd2;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.quiz-question-title {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.quiz-question-title > span,
+.quiz-feedback-number {
+  align-items: center;
+  background: #e7f0df;
+  border-radius: 50%;
+  color: #2c6248;
+  display: flex;
+  flex: 0 0 36px;
+  font-size: 13px;
+  font-weight: 850;
+  height: 36px;
+  justify-content: center;
+}
+
+.quiz-question h2,
+.quiz-feedback h2,
+.quiz-history h2 {
+  color: #24473b;
+  font-size: 20px;
+  margin: 5px 0 16px;
+}
+
+.quiz-question-title small {
+  color: #6c7f65;
+  display: block;
+  margin: -10px 0 12px;
+}
+
+.quiz-options {
+  display: grid;
+  gap: 10px;
+  margin-left: 50px;
+}
+
+.quiz-options label {
+  align-items: center;
+  background: #f7f9f4;
+  border: 1px solid #d5ded0;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  font-size: 17px;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.quiz-options label.selected {
+  background: #eaf3e4;
+  border-color: #7da66e;
+  box-shadow: 0 0 0 2px rgba(125, 166, 110, .18);
+}
+
+.quiz-options input {
+  accent-color: #2c6248;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
+}
+
+.quiz-submit-row,
+.quiz-result-actions {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.quiz-submit-row > span {
+  color: #5f7069;
+  font-weight: 700;
+}
+
+.quiz-result-banner {
+  align-items: center;
+  background: #fbf2d9;
+  border: 1px solid #ead8a8;
+  border-radius: 20px;
+  display: flex;
+  gap: 16px;
+  padding: 22px 24px;
+}
+
+.quiz-result-banner.passed {
+  background: #edf6e8;
+  border-color: #bcd8b0;
+}
+
+.quiz-result-banner > span {
+  align-items: center;
+  background: #fff;
+  border-radius: 50%;
+  color: #2c6248;
+  display: flex;
+  flex: 0 0 48px;
+  font-size: 24px;
+  font-weight: 900;
+  height: 48px;
+  justify-content: center;
+}
+
+.quiz-result-banner strong {
+  color: #24473b;
+  font-size: 22px;
+}
+
+.quiz-result-banner p,
+.quiz-feedback p {
+  color: #5f7069;
+  margin: 4px 0 0;
+}
+
+.quiz-feedback-list {
+  display: grid;
+  gap: 12px;
+}
+
+.quiz-feedback {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+
+.quiz-feedback.correct {
+  border-color: #a9cca0;
+}
+
+.quiz-feedback > strong {
+  color: #a04b38;
+  font-size: 13px;
+}
+
+.quiz-feedback.correct > strong {
+  color: #39734b;
+}
+
+.quiz-history {
+  display: grid;
+  gap: 14px;
+}
+
+.quiz-history ol {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quiz-history li {
+  align-items: center;
+  background: #f7f9f4;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr auto 130px;
+  padding: 11px 14px;
+}
+
+.quiz-history li small {
+  color: #6c7f65;
+  text-align: right;
 }
 
 .spelling-module-home {
@@ -4287,9 +4789,9 @@ button.profile-avatar-choice {
   .account-content.student-content:not(.student-lesson-content) {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto;
-    height: calc(100svh - 36px);
+    height: auto;
     max-width: none;
-    min-height: 0;
+    min-height: calc(100svh - 36px);
   }
 
   .student-content:not(.student-lesson-content) .student-home {
@@ -4441,7 +4943,7 @@ button.profile-avatar-choice {
     border-radius: 22px;
     min-height: clamp(205px, 25svh, 286px);
     padding: clamp(18px, 2.3vh, 26px) 34px;
-    transform: translateY(clamp(-86px, -7.5svh, -28px));
+    transform: none;
   }
 
   .student-welcome-animation-space {
@@ -5313,6 +5815,50 @@ button.profile-avatar-choice {
 .single-vowel-letter.special-sign-display {
   font-size: clamp(105px, 13vw, 170px);
   letter-spacing: -.06em;
+}
+
+@media (max-width: 700px) {
+  .quiz-launcher-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quiz-launcher-card,
+  .quiz-header,
+  .quiz-submit-row,
+  .quiz-result-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quiz-page {
+    margin-top: 22px;
+    padding-inline: 16px;
+  }
+
+  .quiz-progress-pill {
+    width: 100%;
+  }
+
+  .quiz-options {
+    margin-left: 0;
+  }
+
+  .quiz-feedback {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .quiz-feedback > strong {
+    grid-column: 2;
+  }
+
+  .quiz-history li {
+    grid-template-columns: 1fr auto;
+  }
+
+  .quiz-history li small {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
 }
 
 </style>
