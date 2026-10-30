@@ -5,6 +5,7 @@ import bunnyAvatar from '../assets/avatars/bunny.png'
 import flowerAvatar from '../assets/avatars/flower.png'
 import koalaAvatar from '../assets/avatars/koala.png'
 import sproutAvatar from '../assets/avatars/sprout.png'
+import ParentDashboard from '../components/ParentDashboard.vue'
 import wordHouse from '../assets/words/house.png'
 import wordWater from '../assets/words/water.png'
 import wordMango from '../assets/words/mango.png'
@@ -1176,10 +1177,8 @@ function signOut() {
               </div>
             </fieldset>
           </form>
-          <section v-else-if="isParentPlaceholder" class="parent-dashboard-placeholder">
-            <div aria-hidden="true">✓</div>
-            <h2>Parent access verified</h2>
-            <p>The Parent Dashboard will be connected here by the team member responsible for that page.</p>
+          <section v-else-if="isParentPlaceholder" aria-label="Parent dashboard">
+            <ParentDashboard :children="children" />
             <button class="secondary" type="button" @click="closeParentArea">Back to child profiles</button>
           </section>
           <section v-else-if="isStudentHome && studentHome" class="student-home" aria-label="Student learning homepage">
