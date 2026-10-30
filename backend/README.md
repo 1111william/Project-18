@@ -64,11 +64,10 @@ Stop services with `docker compose down`. Add `--volumes` only when you intentio
 
 ## Tests
 
-Install the development requirements and run the Quiz contract tests from the repository root:
+Run the Quiz contract tests from the repository root:
 
 ```powershell
-& .venv/Scripts/python -m pip install -r backend/requirements-dev.txt
-& .venv/Scripts/python -m pytest backend/tests/test_quizzes.py -q
+& .venv/Scripts/python -m unittest backend.tests.test_quizzes -v
 ```
 
 On macOS/Linux, use `.venv/bin/python` instead. These tests use an in-memory SQLite database and signed test sessions; the existing MySQL integration suite remains the source of truth for database-specific locking behaviour.
