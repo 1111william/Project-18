@@ -3294,12 +3294,16 @@ button.profile-avatar-choice {
   font-weight: 800;
   height: 58px;
   justify-content: center;
+  grid-column: 1;
+  grid-row: 1 / span 2;
   width: 58px;
 }
 
 .conversation-chapter-copy {
   display: flex;
   flex-direction: column;
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
 }
 
@@ -3332,12 +3336,11 @@ button.profile-avatar-choice {
 
 .conversation-chapter-meta {
   align-items: center;
-  bottom: 20px;
   display: flex;
   gap: 5px;
-  left: 101px;
-  position: absolute;
-  right: 24px;
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
 }
 
 .conversation-chapter-meta b {
